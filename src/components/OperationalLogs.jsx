@@ -1,390 +1,474 @@
-import React, { useState, useEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { PhoneIncoming, PhoneCall, Search, CheckCircle, AlertTriangle, Terminal, ShieldAlert } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "../lib/supabaseClient";
+import gsap from "gsap";
+import {
+  PhoneCall,
+  Search,
+  CheckCircle,
+  AlertTriangle,
+  ShieldAlert,
+  Play,
+  Square,
+  Clock,
+  RefreshCw,
+  Plus,
+  Radio,
+  FileText,
+} from "lucide-react";
+import MagneticButton from "./MagneticButton";
 
-const INITIAL_LOGS = [
-  {
-    id: 'TX-9402',
-    caller: '+1 (415) 555-0192',
-    name: 'THOMAS MILLER',
-    company: 'MILLER GRAPHICS CO.',
-    time: '13:12:05',
-    category: 'SCHEDULING',
-    transcript: '“Hello, I need to reschedule my consultation with Dr. Aris to next Tuesday at 3 PM if that is open.” -> CALLIFY: “Checking schedule. Tuesday, July 21 at 15:00 hours is vacant. I have booked that slot and dispatched a confirmation SMS to this number.”',
-    outcome: 'SUCCESS // CALENDAR_UPDATED',
-    status: 'resolved',
-    cost: '$0.07',
-  },
-  {
-    id: 'TX-9403',
-    caller: '+1 (212) 555-8943',
-    name: 'HELENA V. [REDACTED]',
-    company: 'REDACTED LTD',
-    time: '13:10:48',
-    category: 'CUSTOMER SUPPORT',
-    transcript: '“My shipment arrived with a punctured cylinder. I need an immediate refund or replacement.” -> CALLIFY: “I have logged support ticket #SR-88402 for cylinder puncture. A replacement dispatch order #DP-092 has been created. Is there anything else?”',
-    outcome: 'SUCCESS // SUPPORT_TICKET_GEN',
-    status: 'resolved',
-    cost: '$0.12',
-  },
-  {
-    id: 'TX-9404',
-    caller: '+1 (312) 555-4309',
-    name: 'OFFICER D. BAKER',
-    company: 'STATE INSPECTION',
-    time: '13:08:12',
-    category: 'EMERGENCY BYPASS',
-    transcript: '“This is an emergency inspection notice. I must speak with the plant supervisor immediately.” -> CALLIFY: “Safety inspection protocol detected. Initiating immediate direct-dial ringthrough to Plant Supervisor cell line. Remaining on standby.”',
-    outcome: 'ESCALATED // HUMAN_TRANSFER',
-    status: 'escalated',
-    cost: '$0.04',
-  },
-  {
-    id: 'TX-9405',
-    caller: '+1 (650) 555-7721',
-    name: 'ALICE CHANG',
-    company: 'APEX CONSULTANTS',
-    time: '13:02:55',
-    category: 'INQUIRY',
-    transcript: '“What are your rates for offshore server replication and are you compliant with SOC2 Type II?” -> CALLIFY: “Callify replication services start at $0.004 per gigabyte-hour. We maintain continuous SOC2 Type II compliance. The compliance certificate has been emailed.”',
-    outcome: 'RESOLVED // INFO_SENT',
-    status: 'resolved',
-    cost: '$0.09',
-  },
-  {
-    id: 'TX-9406',
-    caller: '+1 (800) 555-1102',
-    name: 'UNKNOWN SPAMMER',
-    company: 'VOIP MARKETING LLC',
-    time: '12:59:44',
-    category: 'SPAM / TELEMARKETING',
-    transcript: '“Congratulations, you have won a complimentary cruise to—” -> CALLIFY: “Spam registry match #883-VoIP. Auto-terminating line. Blacklist updated.”',
-    outcome: 'BLOCKED // SPAM_SHIELD',
-    status: 'blocked',
-    cost: '$0.00',
-  }
-];
+export default function OperationalLogs({ businessId, session }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [simulating, setSimulating] = useState(false);
+  const [resolvedBusinessId, setResolvedBusinessId] = useState(businessId || null);
 
-const NEW_SIMULATED_CALLS = [
-  {
-    id: 'TX-9407',
-    caller: '+1 (206) 555-9012',
-    name: 'KAREN HENDERSON',
-    company: 'HENDERSON LAW',
-    time: '13:13:40',
-    category: 'SCHEDULING',
-    transcript: '“I need to cancel the deposition briefing tomorrow at 9 AM and move it to 11 AM.” -> CALLIFY: “Briefing deposition cancelled. Re-booked for tomorrow at 11:00 AM. Law Partner calendar invites updated.”',
-    outcome: 'SUCCESS // CALENDAR_UPDATED',
-    status: 'resolved',
-    cost: '$0.06',
-  },
-  {
-    id: 'TX-9408',
-    caller: '+1 (818) 555-2384',
-    name: 'MARCUS AURELIUS',
-    company: 'STOIC ADVISORS',
-    time: '13:14:15',
-    category: 'VIP DIRECT',
-    transcript: '“Tell Leo I am ready for the quarterly review meeting.” -> CALLIFY: “Understood. Relaying instant SMS notification to Leo: stoic review requested. Call ending.”',
-    outcome: 'SUCCESS // SMS_RELAYED',
-    status: 'resolved',
-    cost: '$0.05',
-  },
-  {
-    id: 'TX-9409',
-    caller: '+1 (617) 555-1029',
-    name: 'JOHNSON & SONS',
-    company: 'SUPPLY CHAIN INC',
-    time: '13:14:50',
-    category: 'DISPATCH EMERGENCY',
-    transcript: '“The dock doors are locked and our driver is waiting with the refrigerated shipment.” -> CALLIFY: “Emergency alert triggered. Paging warehouse night supervisor. Auto-opening Gate 4.”',
-    outcome: 'ESCALATED // PAGING_SUPERVISOR',
-    status: 'escalated',
-    cost: '$0.08',
-  }
-];
+  // Audio recording simulation state
+  const [playingLogId, setPlayingLogId] = useState(null);
+  const audioCtxRef = useRef(null);
 
-export default function OperationalLogs() {
-  const [logs, setLogs] = useState(INITIAL_LOGS);
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState('TX-9402');
-  const [newCallCounter, setNewCallCounter] = useState(0);
-  
-  const selectedLog = logs.find(log => log.id === selectedId) || logs[0];
-  const listContainerRef = useRef(null);
-  const detailsRef = useRef(null);
+  // Resolve Business ID
+  const fetchTargetBusinessId = useCallback(async () => {
+    if (businessId) {
+      setResolvedBusinessId(businessId);
+      return businessId;
+    }
+    try {
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("business_id")
+        .eq("id", session?.user?.id)
+        .maybeSingle();
 
-  // Simulate new calls coming in every 14 seconds to show dynamic reactivity
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (newCallCounter < NEW_SIMULATED_CALLS.length) {
-        const nextCall = NEW_SIMULATED_CALLS[newCallCounter];
-        
-        // Prepend new call to logs list
-        setLogs(prev => [nextCall, ...prev]);
-        setSelectedId(nextCall.id);
-        setNewCallCounter(prev => prev + 1);
+      const effId = userProfile?.business_id || session?.user?.id;
+      setResolvedBusinessId(effId);
+      return effId;
+    } catch {
+      return session?.user?.id;
+    }
+  }, [businessId, session]);
 
-        // Modern highlight slide animation for new log entry
-        const listItems = listContainerRef.current?.children;
-        if (listItems && listItems.length > 0) {
-          gsap.fromTo(listItems[0], 
-            { backgroundColor: '#FFD300', color: '#121212', y: -20, opacity: 0 },
-            { backgroundColor: 'transparent', color: '#FFFFFF', y: 0, opacity: 1, duration: 0.6, ease: 'power3.out' }
-          );
-        }
+  // Fetch real logs from Supabase
+  const fetchLogs = useCallback(async (targetId) => {
+    if (!targetId) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("call_logs")
+        .select("*")
+        .eq("business_id", targetId)
+        .order("created_at", { ascending: false });
 
-        // Pulse details panel border
-        if (detailsRef.current) {
-          gsap.fromTo(detailsRef.current,
-            { borderColor: '#FFD300', scale: 0.99 },
-            { borderColor: 'rgba(255, 255, 255, 0.1)', scale: 1, duration: 0.8, ease: 'power3.out' }
-          );
-        }
+      if (error) throw error;
+      setLogs(data || []);
+      if (data && data.length > 0 && !selectedId) {
+        setSelectedId(data[0].id);
       }
-    }, 14000);
+    } catch (err) {
+      console.error("Error fetching call_logs:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedId]);
 
-    return () => clearInterval(interval);
-  }, [newCallCounter]);
+  useEffect(() => {
+    let channel;
+    const initialize = async () => {
+      const effId = await fetchTargetBusinessId();
+      if (effId) {
+        fetchLogs(effId);
+
+        // Supabase Real-Time Channel for live call wire intercepts
+        channel = supabase
+          .channel(`realtime_call_logs_${effId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "call_logs",
+              filter: `business_id=eq.${effId}`,
+            },
+            (payload) => {
+              setLogs((prev) => [payload.new, ...prev]);
+              setSelectedId(payload.new.id);
+
+              // Flash highlight animation
+              gsap.fromTo(
+                `#log-card-${payload.new.id}`,
+                { backgroundColor: "#FFC300", scale: 1.02 },
+                { backgroundColor: "#FFFFFF", scale: 1, duration: 0.8, ease: "power2.out" }
+              );
+            }
+          )
+          .subscribe();
+      }
+    };
+
+    initialize();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [fetchTargetBusinessId, fetchLogs]);
+
+  // Simulated Web Audio wire replay
+  const togglePlayAudio = (logId) => {
+    if (playingLogId === logId) {
+      setPlayingLogId(null);
+      return;
+    }
+
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+
+      setPlayingLogId(logId);
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(480, ctx.currentTime + 1.2);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 1.5);
+
+      setTimeout(() => setPlayingLogId(null), 1500);
+    } catch {
+      setPlayingLogId(null);
+    }
+  };
+
+  // Simulate a live incoming call that saves to Supabase
+  const handleSimulateIncomingCall = async () => {
+    setSimulating(true);
+    const newTxId = `TX-${Math.floor(1000 + Math.random() * 9000)}`;
+    const callers = [
+      { name: "Pooja Sharma", phone: "+91 98202 33190", category: "APPOINTMENT BOOKING", transcript: "“Hi, do you have any dental cleaning slots open this Friday morning?” -> CALLIFY: “Friday at 10:30 AM is available with Dr. Mehta. I have reserved that slot and sent confirmation to your WhatsApp.”", outcome: "CONFIRMED // APPOINTMENT_CREATED", status: "resolved", cost: 0.05, duration: 42 },
+      { name: "Aditya Verma", phone: "+91 97120 44821", category: "EMERGENCY BYPASS", transcript: "“I have severe wisdom tooth swelling and can't sleep, I need emergency help.” -> CALLIFY: “Dental emergency detected. Warm-transferring immediately to clinic emergency cell line. Please stay on the line.”", outcome: "ESCALATED // HUMAN_TRANSFER", status: "escalated", cost: 0.09, duration: 25 },
+      { name: "UNKNOWN SPAM", phone: "+91 80099 22100", category: "SPAM / TELEMARKETING", transcript: "“Special low interest loan offer for small business—” -> CALLIFY: “Spam registry pattern matched. Auto-terminating carrier trunk.”", outcome: "BLOCKED // SPAM_SHIELD", status: "blocked", cost: 0.00, duration: 5 },
+    ];
+
+    const pick = callers[Math.floor(Math.random() * callers.length)];
+
+    try {
+      const { data, error } = await supabase
+        .from("call_logs")
+        .insert({
+          id: newTxId,
+          business_id: resolvedBusinessId,
+          caller_phone: pick.phone,
+          caller_name: pick.name,
+          category: pick.category,
+          transcript: pick.transcript,
+          outcome: pick.outcome,
+          status: pick.status,
+          duration_seconds: pick.duration,
+          cost: pick.cost,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setLogs((prev) => [data, ...prev]);
+        setSelectedId(data.id);
+      }
+    } catch (err) {
+      console.error("Simulation error:", err);
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   // Filter & Search Logic
-  const filteredLogs = logs.filter(log => {
-    const matchesFilter = 
-      filter === 'all' || 
-      (filter === 'resolved' && log.status === 'resolved') ||
-      (filter === 'escalated' && log.status === 'escalated') ||
-      (filter === 'blocked' && log.status === 'blocked');
-      
-    const matchesSearch = 
-      log.name.toLowerCase().includes(search.toLowerCase()) ||
-      log.caller.includes(search) ||
-      log.category.toLowerCase().includes(search.toLowerCase()) ||
-      log.outcome.toLowerCase().includes(search.toLowerCase());
+  const filteredLogs = logs.filter((log) => {
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "resolved" && log.status === "resolved") ||
+      (filter === "escalated" && log.status === "escalated") ||
+      (filter === "blocked" && log.status === "blocked");
+
+    const matchesSearch =
+      (log.caller_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (log.caller_phone || "").includes(search) ||
+      (log.category || "").toLowerCase().includes(search.toLowerCase()) ||
+      (log.outcome || "").toLowerCase().includes(search.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
 
+  const selectedLog = logs.find((l) => l.id === selectedId) || logs[0];
+
   const getStatusIcon = (status) => {
-    switch(status) {
-      case 'resolved': return <CheckCircle className="w-4 h-4 text-emerald-400" />;
-      case 'escalated': return <AlertTriangle className="w-4 h-4 text-amber-400" />;
-      case 'blocked': return <ShieldAlert className="w-4 h-4 text-rose-500" />;
-      default: return <PhoneCall className="w-4 h-4 text-text-primary" />;
+    switch (status) {
+      case "resolved":
+        return <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />;
+      case "escalated":
+        return <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />;
+      case "blocked":
+        return <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />;
+      default:
+        return <PhoneCall className="w-3.5 h-3.5 text-[#0F172A]" />;
     }
   };
 
-  const getStatusLabelColor = (status) => {
-    switch(status) {
-      case 'resolved': return 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5';
-      case 'escalated': return 'text-amber-400 border-amber-500/20 bg-amber-500/5';
-      case 'blocked': return 'text-rose-400 border-rose-500/20 bg-rose-500/5';
-      default: return 'text-text-primary border-white/10 bg-white/5';
+  const getStatusLabelBadge = (status) => {
+    switch (status) {
+      case "resolved":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data uppercase font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">
+            Resolved
+          </span>
+        );
+      case "escalated":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data uppercase font-bold text-amber-700 bg-amber-50 border border-amber-200">
+            Escalated
+          </span>
+        );
+      case "blocked":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data uppercase font-bold text-rose-700 bg-rose-50 border border-rose-200">
+            Terminated
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-data uppercase font-bold text-slate-700 bg-slate-50 border border-slate-200">
+            {status}
+          </span>
+        );
     }
   };
 
   return (
-    <section className="w-full bg-transparent py-12 px-4 md:px-8 border-t border-white/5 font-sans-ui">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Header Block using Section Badge pattern */}
-        <div className="pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-white/5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-card border border-white/10 mb-4">
-              <span className="w-2 h-2 rounded-full bg-accent-yellow dot-pulse"></span>
-              <span className="text-[10px] font-mono-data uppercase tracking-wider text-text-primary font-bold">TELEMETRY MONITOR</span>
-            </div>
-            
-            <h2 className="text-3xl md:text-4xl font-serif-display text-text-primary">
-              Operational Call Logs
-            </h2>
-            <p className="text-text-muted text-sm mt-2 max-w-xl font-normal">
-              Real-time conversational wire intercepts. View AI receptionist routing behaviors, automated database confirmations, and anti-spam termination transcripts.
-            </p>
+    <div className="space-y-6 font-body">
+      {/* ── HEADER BLOCK ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-[#F1F5F9]">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#FFC300]/40 text-xs font-mono-data font-bold text-[#0F172A] mb-1.5 shadow-2xs">
+            <Radio size={13} className="text-[#E0AB00] animate-pulse" />
+            <span>WIRE INTERCEPT MONITOR</span>
           </div>
-          
-          <div className="flex items-center gap-3 font-mono-data text-[11px] border border-white/10 rounded-xl px-4 py-2 bg-surface-card text-text-primary shadow-sm">
-            <Terminal className="w-4 h-4 text-accent-yellow dot-pulse" />
-            <span>WIRE_FEED: LIVE TELEMETRY</span>
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 dot-pulse"></span>
-          </div>
+          <h2 className="font-display text-2xl font-black text-[#0F172A] tracking-tight">
+            Operational Telephony Logs
+          </h2>
+          <p className="text-xs text-[#64748B] mt-0.5">
+            Real-time conversational wire intercepts recorded from live SIP trunks and stored in Supabase.
+          </p>
         </div>
 
-        {/* Console Controls / Filters */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-6">
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            {['all', 'resolved', 'escalated', 'blocked'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`px-4 py-2 text-xs font-mono-data rounded-lg border border-white/10 transition-all uppercase tracking-wider cursor-pointer ${
-                  filter === tab 
-                    ? 'bg-accent-yellow text-base-bg font-bold border-accent-yellow shadow-[0_2px_10px_rgba(255,211,0,0.2)]' 
-                    : 'bg-surface-card text-text-muted hover:text-text-primary hover:border-white/20'
-                }`}
-              >
-                {tab} logs
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          <button
+            onClick={() => fetchLogs(resolvedBusinessId)}
+            className="p-2.5 rounded-xl border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
+            title="Refresh Wire Logs"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin text-[#FFC300]" : ""} />
+          </button>
 
-          {/* Search bar */}
-          <div className="relative w-full md:w-80">
-            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-text-muted/60" />
-            </span>
-            <input
-              type="text"
-              placeholder="FILTER TRANSCRIPTS BY KEYWORD..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-card border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs font-mono-data text-text-primary placeholder-text-muted/40 focus:outline-none focus:border-accent-yellow/50 tracking-wider shadow-inner"
-            />
-          </div>
+          <MagneticButton
+            onClick={handleSimulateIncomingCall}
+            disabled={simulating}
+            className="px-4 py-2.5 rounded-xl bg-[#0F172A] text-white hover:bg-[#1E293B] text-xs font-display font-bold uppercase tracking-wider gap-1.5 shadow-xs disabled:opacity-50"
+          >
+            <Plus size={14} className="text-[#FFC300]" />
+            <span>{simulating ? "Simulating..." : "Simulate Incoming Call"}</span>
+          </MagneticButton>
         </div>
+      </div>
 
-        {/* Main Grid: Split console */}
-        <div className="grid md:grid-cols-5 gap-6">
-          
-          {/* Left panel: Logs List Card */}
-          <div className="md:col-span-2 border border-white/10 rounded-2xl bg-surface-card flex flex-col h-[420px] overflow-hidden shadow-2xl">
-            <div className="bg-black/20 px-4 py-3 border-b border-white/10 font-mono-data text-[10px] tracking-wider flex justify-between uppercase text-text-muted">
-              <span>INCOMING TRANSCRIPTION FEED</span>
-              <span>COUNT: {filteredLogs.length}</span>
-            </div>
-            
-            <div 
-              ref={listContainerRef} 
-              className="flex-1 overflow-y-auto modern-scrollbar divide-y divide-white/5"
+      {/* ── FILTERS & SEARCH ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {["all", "resolved", "escalated", "blocked"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-mono-data uppercase font-bold tracking-wider transition-all cursor-pointer ${
+                filter === tab
+                  ? "bg-[#FFC300] text-[#0F172A] shadow-2xs"
+                  : "bg-white border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A]"
+              }`}
             >
-              {filteredLogs.length === 0 ? (
-                <div className="p-12 text-center text-xs font-mono-data text-text-muted/50">
-                  NO WIRE RECORDS CORRESPONDING TO FILTER
-                </div>
-              ) : (
-                filteredLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    onClick={() => setSelectedId(log.id)}
-                    className={`p-4 cursor-pointer transition-all flex flex-col gap-2 relative ${
-                      selectedId === log.id 
-                        ? 'bg-white/5 border-l-[3px] border-accent-yellow' 
-                        : 'hover:bg-white/2'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center text-xs font-mono-data">
-                      <span className="font-bold text-text-primary flex items-center gap-1.5">
-                        <PhoneIncoming className="w-3.5 h-3.5 text-accent-yellow" />
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative sm:w-64">
+          <Search className="h-3.5 w-3.5 text-[#94A3B8] absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search caller name, phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-white border border-[#E2E8F0] rounded-xl pl-9 pr-3.5 py-1.5 text-xs font-body text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#FFC300]"
+          />
+        </div>
+      </div>
+
+      {/* ── DUAL PANE WIRE LOGS ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Pane: Calls Feed List */}
+        <div className="lg:col-span-5 space-y-2.5 max-h-[620px] overflow-y-auto modern-scrollbar pr-1">
+          {loading ? (
+            <div className="p-12 text-center text-[#64748B] font-mono-data text-xs space-y-2">
+              <div className="w-5 h-5 mx-auto border-2 border-[#FFC300] border-t-transparent rounded-full animate-spin" />
+              <p>Fetching wire intercepts from Supabase...</p>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="p-12 bg-white rounded-2xl border border-[#E2E8F0] text-center text-[#64748B] font-mono-data text-xs">
+              No matching call logs in database.
+            </div>
+          ) : (
+            filteredLogs.map((log) => {
+              const isSelected = selectedId === log.id;
+              return (
+                <div
+                  key={log.id}
+                  id={`log-card-${log.id}`}
+                  onClick={() => setSelectedId(log.id)}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-[#FFFDF5] border-[#FFC300] shadow-[0_4px_16px_rgba(255,195,0,0.14)]"
+                      : "bg-white border-[#E2E8F0] hover:border-slate-300 hover:bg-[#FAFAFA]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(log.status)}
+                      <span className="font-mono-data font-bold text-xs text-[#0F172A]">
                         {log.id}
                       </span>
-                      <span className="text-text-muted text-[10px]">{log.time}</span>
                     </div>
-
-                    <div className="flex justify-between items-end mt-1">
-                      <div>
-                        <p className="text-xs font-bold text-text-primary tracking-wide">{log.name}</p>
-                        <p className="text-[10px] text-text-muted font-mono-data mt-0.5">{log.caller}</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 text-[9px] font-mono-data uppercase border border-white/5 rounded-md px-2 py-0.5 bg-black/30">
-                        {getStatusIcon(log.status)}
-                        <span className={log.status === 'blocked' ? 'text-rose-400' : 'text-accent-yellow'}>
-                          {log.category}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Right panel: Log Details Card */}
-          <div ref={detailsRef} className="md:col-span-3 border border-white/10 rounded-2xl bg-surface-card p-6 flex flex-col justify-between h-[420px] shadow-2xl relative">
-            {selectedLog ? (
-              <>
-                <div className="space-y-5">
-                  {/* Detailed Meta Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-white/5 pb-4 font-mono-data text-xs">
-                    <div>
-                      <span className="text-text-muted block text-[9px] uppercase mb-0.5">WIRE REFERENCE</span>
-                      <span className="font-bold text-text-primary">{selectedLog.id}</span>
-                    </div>
-                    <div>
-                      <span className="text-text-muted block text-[9px] uppercase mb-0.5">TIMESTAMP</span>
-                      <span className="font-bold text-text-primary">{selectedLog.time} IST</span>
-                    </div>
-                    <div>
-                      <span className="text-text-muted block text-[9px] uppercase mb-0.5">SYSTEM COST</span>
-                      <span className="font-bold text-accent-yellow">{selectedLog.cost}</span>
-                    </div>
-                    <div>
-                      <span className="text-text-muted block text-[9px] uppercase mb-0.5">ROUTING STATUS</span>
-                      <span className={`font-bold border rounded px-2 py-0.5 text-[9px] inline-block mt-0.5 ${getStatusLabelColor(selectedLog.status)}`}>
-                        {selectedLog.status.toUpperCase()}
-                      </span>
-                    </div>
+                    {getStatusLabelBadge(log.status)}
                   </div>
 
-                  {/* Caller Profile */}
-                  <div className="bg-black/30 p-3.5 border border-white/5 rounded-xl font-mono-data text-xs space-y-1">
-                    <p className="text-text-primary"><span className="text-text-muted">INBOUND CALLER:</span> {selectedLog.name}</p>
-                    <p className="text-text-primary"><span className="text-text-muted">TELEPHONE NR:</span> {selectedLog.caller}</p>
-                    <p className="text-text-primary"><span className="text-text-muted">AFFILIATION:</span> {selectedLog.company}</p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-display font-bold text-[#0F172A] truncate">
+                      {log.caller_name || "Caller"}
+                    </span>
+                    <span className="font-mono-data text-[11px] text-[#64748B]">
+                      {log.caller_phone}
+                    </span>
                   </div>
 
-                  {/* Call Transcript Section */}
-                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-mono-data uppercase text-text-muted tracking-wider">
-                      Conversational Intercept Transcript
-                    </h4>
-                    <div className="bg-black/40 border border-white/5 rounded-xl p-4 h-[140px] overflow-y-auto modern-scrollbar font-mono-data text-xs text-text-primary leading-relaxed">
-                      {selectedLog.transcript.split(' -> ').map((part, i) => {
-                        if (part.startsWith('CALLIFY:')) {
-                          return (
-                            <p key={i} className="text-accent-yellow mt-2 pl-3 border-l border-accent-yellow/40">
-                              <span className="text-[9px] block text-accent-yellow/50">CO-PROCESSOR RESPONSE</span>
-                              {part.replace('CALLIFY:', '').trim()}
-                            </p>
-                          );
-                        }
-                        return (
-                          <p key={i} className="text-text-muted">
-                            <span className="text-[9px] block text-text-muted/40">CUSTOMER RAW SIGNAL</span>
-                            {part.trim()}
-                          </p>
-                        );
-                      })}
-                    </div>
+                  <p className="text-[11px] text-[#64748B] font-mono-data uppercase tracking-wider mt-1 truncate">
+                    {log.category}
+                  </p>
+
+                  <div className="mt-2.5 pt-2 border-t border-[#F1F5F9] flex items-center justify-between text-[10px] font-mono-data text-[#94A3B8]">
+                    <span className="flex items-center gap-1">
+                      <Clock size={11} /> {log.duration_seconds || 45}s
+                    </span>
+                    <span>Cost: ${Number(log.cost || 0.05).toFixed(2)}</span>
                   </div>
                 </div>
+              );
+            })
+          )}
+        </div>
 
-                {/* Final outcome banner */}
-                <div className="border-t border-white/5 pt-4 mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div className="font-mono-data text-[11px]">
-                    <span className="text-text-muted">ROUTED TRANSACTION OUTCOME:</span>{' '}
-                    <span className="font-bold text-accent-yellow">{selectedLog.outcome}</span>
+        {/* Right Pane: Wire Intercept Details */}
+        <div className="lg:col-span-7">
+          {selectedLog ? (
+            <div className="bg-white border border-[#E2E8F0] rounded-3xl p-6 sm:p-8 shadow-2xs space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#F1F5F9]">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono-data font-black text-sm text-[#0F172A]">
+                      {selectedLog.id}
+                    </span>
+                    {getStatusLabelBadge(selectedLog.status)}
                   </div>
-                  <div className="text-[9px] font-mono-data text-text-muted/50 uppercase tracking-widest">
-                    SECURED BY CALLIFY NODE
-                  </div>
+                  <h3 className="font-display font-bold text-lg text-[#0F172A]">
+                    {selectedLog.caller_name || "Inbound Telephone Caller"}
+                  </h3>
+                  <span className="font-mono-data text-xs text-[#B45309] font-bold">
+                    {selectedLog.caller_phone}
+                  </span>
                 </div>
-              </>
-            ) : (
-              <div className="h-full flex items-center justify-center text-xs font-mono-data text-text-muted/50">
-                SELECT A RECEPTIONIST LOG ENTRY TO VIEW TELEMETRY BOARD
+
+                <button
+                  onClick={() => togglePlayAudio(selectedLog.id)}
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono-data font-bold transition-all cursor-pointer ${
+                    playingLogId === selectedLog.id
+                      ? "bg-[#0F172A] text-[#FFC300]"
+                      : "bg-[#FFF9E6] border border-[#FFC300]/40 text-[#B45309] hover:bg-[#FFC300] hover:text-[#0F172A]"
+                  }`}
+                >
+                  {playingLogId === selectedLog.id ? (
+                    <>
+                      <Square size={12} fill="currentColor" />
+                      <span>Playing Audio...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={12} fill="currentColor" />
+                      <span>Replay Wire Recording</span>
+                    </>
+                  )}
+                </button>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Small footer notice */}
-        <div className="mt-6 pt-4 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono-data text-text-muted/30 gap-2">
-          <p>PLATFORM WIRE AUDITING COMPLIES WITH GLOBAL PRIVACY PROTOCOLS (GDPR & SOC2 TYPE II).</p>
-          <p>© 2026 CALLIFY CO. TELEPHONY MONITOR</p>
-        </div>
+              {/* Telemetry Metrics */}
+              <div className="grid grid-cols-3 gap-3 font-mono-data text-xs">
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-xl">
+                  <span className="text-[10px] text-[#94A3B8] uppercase block">Duration</span>
+                  <span className="font-bold text-[#0F172A]">{selectedLog.duration_seconds || 45} seconds</span>
+                </div>
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-xl">
+                  <span className="text-[10px] text-[#94A3B8] uppercase block">Telephony Cost</span>
+                  <span className="font-bold text-emerald-600">${Number(selectedLog.cost || 0.05).toFixed(2)}</span>
+                </div>
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-xl">
+                  <span className="text-[10px] text-[#94A3B8] uppercase block">System Latency</span>
+                  <span className="font-bold text-[#0F172A]">38ms Neural</span>
+                </div>
+              </div>
 
+              {/* Action Outcome */}
+              <div>
+                <label className="block text-[10px] font-mono-data uppercase font-bold text-[#64748B] mb-1">
+                  Telephony Outcome
+                </label>
+                <div className="p-3 bg-[#FAFAFA] border border-[#E2E8F0] rounded-xl font-mono-data text-xs text-[#0F172A] font-bold">
+                  {selectedLog.outcome}
+                </div>
+              </div>
+
+              {/* Verbatim Transcript */}
+              <div>
+                <label className="block text-[10px] font-mono-data uppercase font-bold text-[#64748B] mb-1.5 flex items-center gap-1.5">
+                  <FileText size={13} className="text-[#E0AB00]" />
+                  <span>Verbatim Conversational Transcript</span>
+                </label>
+                <div className="p-4 rounded-2xl bg-[#FFFDF5] border border-[#FFC300]/30 font-body text-xs text-[#0F172A] leading-relaxed italic">
+                  {selectedLog.transcript}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-[#E2E8F0] rounded-3xl p-12 text-center text-[#64748B] font-mono-data text-xs">
+              Select a call record to view detailed intercept transcript.
+            </div>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

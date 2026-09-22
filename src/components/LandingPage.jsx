@@ -14,29 +14,26 @@ import {
   Zap,
   Star,
   MessageSquare,
-  Clock,
-  Users,
-  IndianRupee,
   Headphones,
-  Bot,
-  Plug,
-  Settings2,
   Rocket,
-  Quote,
-  MapPin,
-  Mail,
   PhoneCall,
-  PhoneOff,
-  Mic,
-  Check,
   Volume2,
-  VolumeX,
+  Layers,
+  Sparkle,
+  Cpu,
+  Radio,
 } from "lucide-react";
 
-/* ─────────────────────────── Design Tokens ─────────────────────────── */
+import AcousticVisualizer from "./AcousticVisualizer";
+import TiltCard from "./TiltCard";
+import MagneticButton from "./MagneticButton";
+import RoiCalculator from "./RoiCalculator";
+
+/* ─────────────────────────── Design Tokens (Strict Theme Preservation) ─────────────────────────── */
 const C = {
   bg: "#FFFFFF",
   surface: "#FAFAFA",
+  surfaceAlt: "#F8FAFC",
   accent: "#FFC300",
   accentLight: "#FFF9E6",
   accentDark: "#E0AB00",
@@ -46,31 +43,16 @@ const C = {
   borderStrong: "#E2E8F0",
 };
 
-/* ─────────────────────────── Animation Presets ─────────────────────────── */
-const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { type: "spring", stiffness: 60, damping: 18, delay: i * 0.1 },
-  }),
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } },
-};
-
-/* ─────────────────────────── Scroll-Triggered Wrapper ─────────────────────────── */
+/* ─────────────────────────── Scroll Reveal Wrapper ─────────────────────────── */
 function Reveal({ children, className = "", delay = 0 }) {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-60px" });
+  const inView = useInView(ref, { once: true, margin: "-50px" });
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 40 }}
+      initial={{ opacity: 0, y: 35 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ type: "spring", stiffness: 60, damping: 18, delay }}
+      transition={{ type: "spring", stiffness: 70, damping: 20, delay }}
       className={className}
     >
       {children}
@@ -78,29 +60,12 @@ function Reveal({ children, className = "", delay = 0 }) {
   );
 }
 
-/* ─────────────────────────── Highlighted Word Underline ─────────────────────────── */
+/* ─────────────────────────── Highlight Underline ─────────────────────────── */
 function HighlightedWord({ children }) {
   return (
     <span className="relative inline-block">
-      <span className="relative z-10">{children}</span>
-      <svg
-        className="absolute -bottom-2 left-0 w-full"
-        viewBox="0 0 300 16"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <motion.path
-          d="M2 10 C60 2, 120 14, 180 6 C220 2, 260 12, 298 8"
-          stroke={C.accent}
-          strokeWidth="5"
-          strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.2, ease: "easeInOut", delay: 0.6 }}
-        />
-      </svg>
+      <span className="relative z-10 text-[#0F172A]">{children}</span>
+      <span className="absolute bottom-1.5 left-0 w-full h-3 bg-[#FFC300]/40 -z-0 rounded-sm pointer-events-none" />
     </span>
   );
 }
@@ -109,604 +74,589 @@ function HighlightedWord({ children }) {
 function SectionBadge({ icon: Icon, children }) {
   return (
     <span
-      className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold font-display mb-4"
-      style={{ backgroundColor: C.accentLight, color: C.accentDark }}
+      className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold font-display tracking-tight mb-4 border bg-[#FFFDF5] text-[#9A3412] border-[#FFC300]/35 shadow-2xs"
     >
-      {Icon && <Icon size={14} />}
+      {Icon && <Icon size={13} className="text-[#E0AB00]" />}
       {children}
     </span>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   NAVIGATION BAR
+   1. RESPONSIVE FLOATING NAVBAR & MOBILE BOTTOM DOCK
    ═══════════════════════════════════════════════════════════════════════════════ */
 function Navbar({ onNavigateToAuth }) {
-  return (
-    <motion.nav
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 80, damping: 20 }}
-      className="font-body fixed top-0 left-0 right-0 z-50 backdrop-blur-xl border-b"
-      style={{
-        backgroundColor: "rgba(255,255,255,0.88)",
-        borderColor: C.border,
-      }}
-    >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        {/* Logo */}
-        <a href="#" className="flex items-center gap-2.5 group">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl shadow-sm"
-            style={{ backgroundColor: C.accent }}
-          >
-            <Phone size={20} color={C.fg} strokeWidth={2.5} />
-          </div>
-          <span
-            className="font-display text-2xl font-bold tracking-tight"
-            style={{ color: C.fg }}
-          >
-            Callify
-          </span>
-        </a>
+  const [scrolled, setScrolled] = useState(false);
 
-        {/* Links */}
-        <div className="hidden md:flex items-center gap-8">
-          {["Features", "How It Works", "Pricing", "Testimonials"].map(
-            (link) => (
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  return (
+    <>
+      {/* ── DESKTOP FLOATING ISLAND NAVBAR (Visible on md and up) ── */}
+      <header className="hidden md:block fixed top-0 left-0 right-0 z-50 px-6 pt-4 transition-transform duration-300">
+        <nav
+          className={`mx-auto max-w-6xl rounded-2xl transition-all duration-300 px-5 py-3 flex items-center justify-between ${
+            scrolled
+              ? "glass-card-light shadow-[0_10px_30px_rgba(15,23,42,0.06)] border-[#E2E8F0]"
+              : "bg-white/80 backdrop-blur-md border border-slate-100"
+          }`}
+        >
+          {/* Brand */}
+          <a href="#" className="flex items-center gap-2.5 group">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition-transform group-hover:scale-105"
+              style={{ backgroundColor: C.accent }}
+            >
+              <Phone size={18} color={C.fg} strokeWidth={2.5} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display text-xl font-extrabold tracking-tight" style={{ color: C.fg }}>
+                Callify
+              </span>
+              <span className="text-[10px] font-mono-data font-semibold text-[#E0AB00] -mt-1 tracking-wider">
+                VOICE INTELLIGENCE
+              </span>
+            </div>
+          </a>
+
+          {/* Navigation Links */}
+          <div className="flex items-center gap-7">
+            {[
+              { name: "Live Simulator", href: "#live-simulator" },
+              { name: "Features", href: "#features" },
+              { name: "How It Works", href: "#how-it-works" },
+              { name: "ROI Engine", href: "#roi-calculator" },
+              { name: "Pricing", href: "#pricing" },
+            ].map((item) => (
               <a
-                key={link}
-                href={`#${link.toLowerCase().replace(/\s+/g, "-")}`}
-                className="text-sm font-medium transition-colors duration-200 hover:text-[#E0AB00]"
+                key={item.name}
+                href={item.href}
+                className="text-sm font-medium font-body transition-colors duration-150 hover:text-[#E0AB00]"
                 style={{ color: C.fgMuted }}
               >
-                {link}
+                {item.name}
               </a>
-            )
-          )}
-        </div>
+            ))}
+          </div>
 
-        {/* CTA Buttons */}
-        <div className="flex items-center gap-3">
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onNavigateToAuth}
+              className="text-xs font-bold font-display uppercase tracking-wider px-3 py-2 text-[#0F172A] hover:text-[#E0AB00] transition-colors cursor-pointer"
+            >
+              Sign In
+            </button>
+
+            <MagneticButton
+              onClick={onNavigateToAuth}
+              className="rounded-xl px-5 py-2.5 text-xs font-bold tracking-wide shadow-sm"
+              style={{
+                backgroundColor: C.accent,
+                color: C.fg,
+              }}
+            >
+              <span className="flex items-center gap-1.5">
+                <span>Start Free Trial</span>
+                <ArrowRight size={14} strokeWidth={2.5} />
+              </span>
+            </MagneticButton>
+          </div>
+        </nav>
+      </header>
+
+      {/* ── MOBILE MINIMAL TOP BRAND BAR (Mobile only, zero horizontal overflow) ── */}
+      <header className="md:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 py-2.5 w-full flex items-center justify-between shadow-2xs">
+        <a href="#" className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FFC300] shadow-xs">
+            <Phone size={15} color="#0F172A" strokeWidth={2.5} />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-display text-base font-extrabold tracking-tight text-[#0F172A]">
+              Callify
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+        </a>
+
+        <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToAuth}
-            className="hidden sm:inline-flex text-sm font-semibold transition-colors duration-200 cursor-pointer bg-transparent border-none"
-            style={{ color: C.fg }}
+            className="text-xs font-display font-bold px-3 py-1.5 rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] hover:bg-[#F8FAFC] transition-colors cursor-pointer"
           >
-            Sign In
+            Console Sign In
           </button>
-          <motion.button
-            onClick={onNavigateToAuth}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold shadow-md transition-shadow duration-300 hover:shadow-lg cursor-pointer border-none"
-            style={{ backgroundColor: C.accent, color: C.fg }}
-          >
-            Get Started Free
-            <ArrowRight size={14} />
-          </motion.button>
         </div>
-      </div>
-    </motion.nav>
+      </header>
+
+      {/* ── MOBILE ORGANIZED FLOATING BOTTOM NAVIGATION DOCK (Mobile only) ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E2E8F0] px-2 py-1.5 shadow-[0_-6px_28px_rgba(15,23,42,0.08)] pb-[max(0.6rem,env(safe-area-inset-bottom))] flex items-center justify-between">
+        <div className="flex items-center justify-around flex-1">
+          <a
+            href="#live-simulator"
+            className="flex flex-col items-center py-1 px-2 text-[#64748B] hover:text-[#0F172A] transition-colors"
+          >
+            <Radio size={16} className="text-[#E0AB00]" />
+            <span className="text-[9px] font-mono-data font-bold mt-0.5">Demo</span>
+          </a>
+
+          <a
+            href="#features"
+            className="flex flex-col items-center py-1 px-2 text-[#64748B] hover:text-[#0F172A] transition-colors"
+          >
+            <Cpu size={16} className="text-[#0F172A]" />
+            <span className="text-[9px] font-mono-data font-bold mt-0.5">Features</span>
+          </a>
+
+          <a
+            href="#roi-calculator"
+            className="flex flex-col items-center py-1 px-2 text-[#64748B] hover:text-[#0F172A] transition-colors"
+          >
+            <BarChart3 size={16} className="text-[#0F172A]" />
+            <span className="text-[9px] font-mono-data font-bold mt-0.5">ROI</span>
+          </a>
+
+          <a
+            href="#pricing"
+            className="flex flex-col items-center py-1 px-2 text-[#64748B] hover:text-[#0F172A] transition-colors"
+          >
+            <CalendarCheck size={16} className="text-[#0F172A]" />
+            <span className="text-[9px] font-mono-data font-bold mt-0.5">Pricing</span>
+          </a>
+        </div>
+
+        {/* High-converting CTA button docked right in thumb's reach */}
+        <button
+          onClick={onNavigateToAuth}
+          className="ml-2 px-3.5 py-2 rounded-xl bg-[#FFC300] hover:bg-[#E0AB00] text-[#0F172A] font-display font-black text-xs tracking-tight shadow-xs flex items-center gap-1 cursor-pointer shrink-0 transition-all"
+        >
+          <span>Free Trial</span>
+          <ArrowRight size={13} strokeWidth={2.5} />
+        </button>
+      </nav>
+    </>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   ANIMATED WAVEFORM BARS COMPONENT
+   2. HERO SECTION & INTERACTIVE VOICE LAB (SIGNATURE INTERACTION)
    ═══════════════════════════════════════════════════════════════════════════════ */
-function AudioWaveform({ isActive, color = C.accent, barCount = 24, maxHeight = 32, minHeight = 3 }) {
-  const [heights, setHeights] = useState(() => Array(barCount).fill(minHeight));
-
-  useEffect(() => {
-    if (!isActive) {
-      setHeights(Array(barCount).fill(minHeight));
-      return;
-    }
-    const interval = setInterval(() => {
-      setHeights(prev =>
-        prev.map(() =>
-          Math.floor(Math.random() * (maxHeight - minHeight)) + minHeight
-        )
-      );
-    }, 120);
-    return () => clearInterval(interval);
-  }, [isActive, barCount, maxHeight, minHeight]);
-
-  return (
-    <div className="flex items-center justify-center gap-[3px]" style={{ height: `${maxHeight}px` }}>
-      {heights.map((h, i) => (
-        <div
-          key={i}
-          className="rounded-full transition-all duration-150"
-          style={{
-            width: "3px",
-            height: `${h}px`,
-            backgroundColor: color,
-            opacity: isActive ? 0.6 + Math.random() * 0.4 : 0.15,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   LIVE CALL TIMER
-   ═══════════════════════════════════════════════════════════════════════════════ */
-function CallTimer({ isActive }) {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    if (!isActive) return;
-    const interval = setInterval(() => setSeconds(s => s + 1), 1000);
-    return () => clearInterval(interval);
-  }, [isActive]);
-  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const s = String(seconds % 60).padStart(2, "0");
-  return (
-    <span className="font-mono-data text-sm font-bold tabular-nums text-white">
-      {m}:{s}
-    </span>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   HERO SECTION — LIVE AI VOICE CALL VISUALIZATION
-   ═══════════════════════════════════════════════════════════════════════════════ */
-const CALL_SCRIPT = [
-  { speaker: "customer", text: "Hi, I'd like to book a haircut for Saturday at 2 PM." },
-  { speaker: "ai", text: "Of course! Let me check Saturday's availability for you..." },
-  { speaker: "ai", text: "Saturday, 2:00 PM is open with Rahul. I'll book that for you right away." },
-  { speaker: "customer", text: "That sounds perfect, thank you!" },
-  { speaker: "ai", text: "Done! You'll receive a confirmation on WhatsApp shortly. Have a great day!" },
+const SCENARIOS = [
+  {
+    id: "clinic",
+    title: "Dental Clinic",
+    callerName: "Aarav Sharma",
+    callerPhone: "+91 98201 44102",
+    avatar: "👨‍💼",
+    script: [
+      { speaker: "caller", text: "Hello! I have a sudden toothache. Do you have an open slot today?" },
+      { speaker: "ai", text: "I'm sorry to hear that! Dr. Mehta has an emergency opening today at 4:30 PM. Would you like me to reserve that for you?" },
+      { speaker: "caller", text: "Yes please, 4:30 PM works perfectly." },
+      { speaker: "ai", text: "Confirmed for 4:30 PM! I've sent the Google Calendar invite and clinic GPS pin to your WhatsApp." },
+    ],
+    bookingResult: {
+      type: "Dental Emergency Consultation",
+      slot: "Today, 4:30 PM",
+      doctor: "Dr. Mehta, BDS",
+      channel: "WhatsApp & SMS Dispatched",
+    },
+  },
+  {
+    id: "salon",
+    title: "Luxury Salon & Spa",
+    callerName: "Priya Nair",
+    callerPhone: "+91 99341 82190",
+    avatar: "👩‍💼",
+    script: [
+      { speaker: "caller", text: "Hi, I want to book a hair spa and styling for Saturday afternoon." },
+      { speaker: "ai", text: "Certainly Priya! Master Stylist Rahul is available this Saturday at 2:00 PM or 4:15 PM." },
+      { speaker: "caller", text: "Let's do 2:00 PM please." },
+      { speaker: "ai", text: "Reserved for Saturday at 2:00 PM. We have also added complimentary scalp therapy to your profile." },
+    ],
+    bookingResult: {
+      type: "Hair Spa + Styling Session",
+      slot: "Saturday, 2:00 PM",
+      doctor: "Stylist Rahul",
+      channel: "Calendar Confirmed",
+    },
+  },
+  {
+    id: "auto",
+    title: "Auto Service Center",
+    callerName: "Vikram Malhotra",
+    callerPhone: "+91 98112 00391",
+    avatar: "🧑‍🔧",
+    script: [
+      { speaker: "caller", text: "My Honda City needs its 40,000km periodic service and brake check." },
+      { speaker: "ai", text: "Good morning Vikram! We can pick up your vehicle tomorrow between 9 AM and 10 AM, or you can drop it off at 8:30 AM." },
+      { speaker: "caller", text: "Please arrange doorstep pickup at 9 AM." },
+      { speaker: "ai", text: "Doorstep valet pickup scheduled for tomorrow at 9:00 AM. Driver details will arrive via SMS 30 minutes prior." },
+    ],
+    bookingResult: {
+      type: "40k Major Service + Valet Pickup",
+      slot: "Tomorrow, 9:00 AM",
+      doctor: "Bay 4 — Team Express",
+      channel: "Job Card #JC-9821 Dispatched",
+    },
+  },
 ];
 
 function HeroSection({ onNavigateToAuth }) {
-  const [currentLine, setCurrentLine] = useState(-1);
+  const [selectedScenarioIdx, setSelectedScenarioIdx] = useState(0);
+  const [callState, setCallState] = useState("connected"); // 'ringing' | 'connected' | 'completed'
+  const [activeStep, setActiveStep] = useState(0);
   const [displayedText, setDisplayedText] = useState("");
-  const [activeSpeaker, setActiveSpeaker] = useState(null); // 'customer' | 'ai' | null
-  const [transcriptLines, setTranscriptLines] = useState([]);
-  const [callState, setCallState] = useState("active"); // 'active' | 'completed'
+  const [callSeconds, setCallSeconds] = useState(14);
+  const [isAudioSpeaking, setIsAudioSpeaking] = useState(true);
 
-  const lineTimerRef = useRef(null);
-  const charTimerRef = useRef(null);
+  const scenario = SCENARIOS[selectedScenarioIdx];
 
-  // Sequentially reveal conversation lines with typewriter effect
+  // Call timer simulation
   useEffect(() => {
-    const startNextLine = (lineIdx) => {
-      if (lineIdx >= CALL_SCRIPT.length) {
-        setActiveSpeaker(null);
-        setCallState("completed");
-        return;
+    let interval;
+    if (callState === "connected") {
+      interval = setInterval(() => setCallSeconds((s) => s + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [callState]);
+
+  // Dialogue progression
+  useEffect(() => {
+    if (callState !== "connected") return;
+
+    const currentLine = scenario.script[activeStep];
+    if (!currentLine) {
+      setCallState("completed");
+      setIsAudioSpeaking(false);
+      return;
+    }
+
+    setIsAudioSpeaking(true);
+    let charIdx = 0;
+    setDisplayedText("");
+
+    const typingInterval = setInterval(() => {
+      if (charIdx <= currentLine.text.length) {
+        setDisplayedText(currentLine.text.slice(0, charIdx));
+        charIdx++;
+      } else {
+        clearInterval(typingInterval);
+        setIsAudioSpeaking(false);
+        // Advance to next after reading pause
+        const nextTimeout = setTimeout(() => {
+          if (activeStep < scenario.script.length - 1) {
+            setActiveStep((prev) => prev + 1);
+          } else {
+            setCallState("completed");
+          }
+        }, 1600);
+        return () => clearTimeout(nextTimeout);
       }
+    }, 24);
 
-      const line = CALL_SCRIPT[lineIdx];
-      setCurrentLine(lineIdx);
-      setActiveSpeaker(line.speaker);
-      setDisplayedText("");
+    return () => clearInterval(typingInterval);
+  }, [callState, activeStep, scenario.script]);
 
-      let charIdx = 0;
-      const typeChar = () => {
-        if (charIdx <= line.text.length) {
-          setDisplayedText(line.text.slice(0, charIdx));
-          charIdx++;
-          charTimerRef.current = setTimeout(typeChar, 28 + Math.random() * 22);
-        } else {
-          // Finished typing — add to transcript, pause, then move to next
-          setTranscriptLines(prev => [...prev, { speaker: line.speaker, text: line.text }]);
-          setActiveSpeaker(null);
-          lineTimerRef.current = setTimeout(() => startNextLine(lineIdx + 1), 1200);
-        }
-      };
-      charTimerRef.current = setTimeout(typeChar, 600);
-    };
+  const restartSimulation = (scenarioIdx = selectedScenarioIdx) => {
+    setSelectedScenarioIdx(scenarioIdx);
+    setActiveStep(0);
+    setDisplayedText("");
+    setCallSeconds(1);
+    setCallState("ringing");
+    setTimeout(() => {
+      setCallState("connected");
+    }, 1400);
+  };
 
-    // Initial delay before starting
-    lineTimerRef.current = setTimeout(() => startNextLine(0), 2000);
-
-    return () => {
-      clearTimeout(lineTimerRef.current);
-      clearTimeout(charTimerRef.current);
-    };
-  }, []);
-
-  const currentSpeakerLabel = callState === "completed"
-    ? "Call Completed"
-    : activeSpeaker === "customer"
-    ? "Customer Speaking..."
-    : activeSpeaker === "ai"
-    ? "Callify AI Speaking..."
-    : "Listening...";
+  const formatTimer = (sec) => {
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  };
 
   return (
     <section
-      className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24"
-      style={{ backgroundColor: C.bg }}
+      id="live-simulator"
+      className="relative overflow-hidden pt-28 pb-20 md:pt-36 md:pb-28 bg-white min-h-[95dvh] flex items-center"
     >
-      {/* Radial glow */}
-      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 h-[700px] w-[1000px] rounded-full blur-3xl opacity-25"
-        style={{ background: "radial-gradient(circle, rgba(255,195,0,0.3) 0%, transparent 70%)" }}
-      />
+      {/* Background Acoustic Ambient Glow */}
+      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 h-[650px] w-[1100px] hero-glow opacity-80" />
       <div className="absolute inset-0 light-dot-grid pointer-events-none opacity-40" />
 
-      <div className="relative mx-auto max-w-7xl px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left Column — Copy */}
-          <div>
+      <div className="relative mx-auto max-w-7xl px-6 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+          
+          {/* ── Left Column: Compelling Copy & Proof ── */}
+          <div className="lg:col-span-6 text-left">
             <Reveal>
-              <SectionBadge icon={Sparkles}>
-                🇮🇳 Built for Indian Businesses
-              </SectionBadge>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <SectionBadge icon={Sparkles}>
+                  Autonomous Voice Agent for India
+                </SectionBadge>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  99.8% Pickup SLA
+                </span>
+              </div>
             </Reveal>
 
             <Reveal delay={0.1}>
-              <h1
-                className="font-display text-5xl sm:text-6xl md:text-7xl font-bold leading-[1.08] tracking-tight"
-                style={{ color: C.fg }}
-              >
-                India's Smartest{" "}
-                <HighlightedWord>AI Receptionist</HighlightedWord>
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.75rem] font-bold text-[#0F172A] tracking-[-0.03em] leading-[1.14] descender-safe">
+                Never Miss A Customer Call Again.{" "}
+                <HighlightedWord>Always Answering.</HighlightedWord>
               </h1>
             </Reveal>
 
             <Reveal delay={0.2}>
-              <p
-                className="font-body mt-6 text-lg md:text-xl leading-relaxed max-w-xl"
-                style={{ color: C.fgMuted }}
-              >
-                Never miss a customer call again. Callify answers every call in
-                Hindi, English & 12+ Indian languages — books appointments,
-                answers FAQs, and routes urgent calls — 24/7, at a fraction of
-                the cost.
+              <p className="font-body text-base sm:text-lg text-[#475569] mt-6 leading-relaxed max-w-xl font-normal">
+                Callify is India's most intelligent AI phone receptionist. Pick up every inbound ring in <strong>Hindi, English & 10+ regional dialects</strong> — books appointments on your calendar, answers complex business queries, and syncs to WhatsApp instantly.
               </p>
             </Reveal>
 
+            {/* CTAs */}
             <Reveal delay={0.3}>
-              <div className="mt-8 flex flex-col sm:flex-row items-start gap-4">
-                <motion.button
+              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+                <MagneticButton
                   onClick={onNavigateToAuth}
-                  whileHover={{
-                    scale: 1.05,
-                    boxShadow: "0 8px 30px rgba(255,195,0,0.35)",
-                  }}
-                  whileTap={{ scale: 0.97 }}
-                  className="inline-flex items-center gap-2.5 rounded-full px-8 py-4 text-base font-semibold font-body shadow-lg cursor-pointer border-none"
-                  style={{ backgroundColor: C.accent, color: C.fg }}
+                  className="px-7 py-3.5 rounded-xl bg-[#0F172A] text-white hover:bg-[#1E293B] shadow-md text-sm font-semibold tracking-tight gap-2.5"
                 >
-                  Start Free 14-Day Trial
-                  <ArrowRight size={16} />
-                </motion.button>
+                  <span>Claim 14-Day Free Pilot</span>
+                  <ArrowRight size={16} className="text-[#FFC300]" />
+                </MagneticButton>
 
-                <motion.a
+                <a
                   href="#how-it-works"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="inline-flex items-center gap-2.5 rounded-full border-2 px-8 py-4 text-base font-semibold font-body cursor-pointer no-underline"
-                  style={{ borderColor: C.borderStrong, color: C.fg }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-semibold font-display border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0F172A] transition-colors shadow-2xs"
                 >
-                  <Headphones size={18} />
-                  See How It Works
-                </motion.a>
+                  <Headphones size={16} className="text-[#E0AB00]" />
+                  <span>Architecture</span>
+                </a>
               </div>
             </Reveal>
 
-            {/* Trust Row */}
+            {/* Trust Badges */}
             <Reveal delay={0.4}>
-              <div
-                className="mt-8 flex flex-wrap items-center gap-6 font-body text-sm"
-                style={{ color: C.fgMuted }}
-              >
-                {[
-                  "No credit card required",
-                  "14-day free trial",
-                  "Cancel anytime",
-                ].map((item) => (
-                  <span key={item} className="flex items-center gap-1.5">
-                    <CheckCircle2 size={14} color={C.accent} />
-                    {item}
-                  </span>
-                ))}
+              <div className="mt-10 pt-6 border-t border-[#F1F5F9] grid grid-cols-3 gap-4">
+                <div>
+                  <div className="font-mono-data text-2xl sm:text-3xl font-black text-[#0F172A]">
+                    &lt; 420ms
+                  </div>
+                  <p className="text-xs text-[#64748B] font-medium mt-0.5">Voice Latency</p>
+                </div>
+                <div>
+                  <div className="font-mono-data text-2xl sm:text-3xl font-black text-[#0F172A]">
+                    12+
+                  </div>
+                  <p className="text-xs text-[#64748B] font-medium mt-0.5">Indian Dialects</p>
+                </div>
+                <div>
+                  <div className="font-mono-data text-2xl sm:text-3xl font-black text-[#0F172A]">
+                    5,000+
+                  </div>
+                  <p className="text-xs text-[#64748B] font-medium mt-0.5">Businesses Active</p>
+                </div>
               </div>
             </Reveal>
           </div>
 
-          {/* ═══════════ Right Column — Live AI Voice Call Demo ═══════════ */}
-          <Reveal delay={0.3} className="flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-[500px]">
-
-              {/* ── Floating "Appointment Booked" badge ── */}
-              <motion.div
-                animate={{ y: [6, -6, 6] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-xl border px-4 py-3 flex items-center gap-3 z-20"
-                style={{ borderColor: C.border }}
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "#DCFCE7" }}>
-                  <CheckCircle2 size={20} color="#22C55E" />
-                </div>
-                <div>
-                  <p className="font-display text-sm font-bold" style={{ color: C.fg }}>Appointment Booked</p>
-                  <p className="font-body text-xs" style={{ color: C.fgMuted }}>Tomorrow, 3:00 PM</p>
-                </div>
-              </motion.div>
-
-              {/* ── Floating "AI Active" badge ── */}
-              <motion.div
-                animate={{ y: [-6, 6, -6] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-4 -right-4 bg-white rounded-xl shadow-lg border px-3 py-2 flex items-center gap-2 z-20"
-                style={{ borderColor: C.border }}
-              >
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
-                <span className="font-body text-xs font-semibold" style={{ color: C.fg }}>AI Active</span>
-              </motion.div>
-
-              {/* ════════ Main Call Card ════════ */}
-              <div
-                className="relative rounded-3xl overflow-hidden"
-                style={{
-                  backgroundColor: C.bg,
-                  border: `1px solid ${C.borderStrong}`,
-                  boxShadow: "0 25px 60px rgba(15,23,42,0.10), 0 10px 25px rgba(15,23,42,0.06)",
-                }}
-              >
-                {/* ── Top Bar: Call Status ── */}
-                <div
-                  className="px-6 py-4 flex items-center justify-between"
-                  style={{ backgroundColor: C.fg }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: C.accent }}>
-                      <Phone size={14} color={C.fg} strokeWidth={2.5} />
-                    </div>
-                    <div>
-                      <p className="font-display text-sm font-bold text-white">
-                        {callState === "active" ? "Live Voice Call" : "Call Completed"}
-                      </p>
-                      <p className="font-body text-[11px] flex items-center gap-1.5" style={{ color: callState === "active" ? "#4ADE80" : "#94A3B8" }}>
-                        <span className="relative flex h-1.5 w-1.5">
-                          {callState === "active" && (
-                            <span className="absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-75 animate-ping" />
-                          )}
-                          <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${callState === "active" ? "bg-[#4ADE80]" : "bg-gray-400"}`} />
-                        </span>
-                        {callState === "active" ? "Connected" : "Disconnected"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CallTimer isActive={callState === "active"} />
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/20">
-                      <PhoneOff size={14} color="#EF4444" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Caller Avatars + Waveform ── */}
-                <div className="px-6 py-8">
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Customer Avatar */}
-                    <div className="flex flex-col items-center gap-3 flex-1">
-                      <div className="relative">
-                        <motion.div
-                          animate={activeSpeaker === "customer" ? { scale: [1, 1.08, 1] } : {}}
-                          transition={{ duration: 0.8, repeat: Infinity }}
-                          className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-                          style={{
-                            backgroundColor: activeSpeaker === "customer" ? C.accentLight : C.surface,
-                            border: `3px solid ${activeSpeaker === "customer" ? C.accent : C.borderStrong}`,
-                            transition: "border-color 0.3s, background-color 0.3s",
-                          }}
-                        >
-                          <span className="font-display text-2xl font-bold" style={{ color: activeSpeaker === "customer" ? C.accentDark : C.fgMuted }}>👤</span>
-                        </motion.div>
-                        {activeSpeaker === "customer" && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                            style={{ backgroundColor: C.accent }}
-                          >
-                            <Mic size={12} color={C.fg} />
-                          </motion.div>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <p className="font-display text-sm font-bold" style={{ color: C.fg }}>Customer</p>
-                        <p className="font-body text-[11px]" style={{ color: C.fgMuted }}>+91 98765 XXXXX</p>
-                      </div>
-                    </div>
-
-                    {/* Connection Indicator */}
-                    <div className="flex flex-col items-center gap-2 px-2">
-                      {/* Animated connection dots */}
-                      <div className="flex items-center gap-1">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <motion.div
-                            key={i}
-                            animate={{ opacity: [0.2, 1, 0.2] }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: C.accent }}
-                          />
-                        ))}
-                      </div>
-                      <div
-                        className="px-3 py-1 rounded-full"
-                        style={{ backgroundColor: C.accentLight }}
-                      >
-                        <Phone size={12} color={C.accentDark} />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <motion.div
-                            key={i}
-                            animate={{ opacity: [0.2, 1, 0.2] }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.75 + i * 0.2 }}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: C.accent }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* AI Avatar */}
-                    <div className="flex flex-col items-center gap-3 flex-1">
-                      <div className="relative">
-                        <motion.div
-                          animate={activeSpeaker === "ai" ? { scale: [1, 1.08, 1] } : {}}
-                          transition={{ duration: 0.8, repeat: Infinity }}
-                          className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-                          style={{
-                            backgroundColor: activeSpeaker === "ai" ? C.accent : C.surface,
-                            border: `3px solid ${activeSpeaker === "ai" ? C.accentDark : C.borderStrong}`,
-                            transition: "border-color 0.3s, background-color 0.3s",
-                          }}
-                        >
-                          <Bot size={28} color={activeSpeaker === "ai" ? C.fg : C.fgMuted} />
-                        </motion.div>
-                        {activeSpeaker === "ai" && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                            style={{ backgroundColor: C.accent }}
-                          >
-                            <Volume2 size={12} color={C.fg} />
-                          </motion.div>
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <p className="font-display text-sm font-bold" style={{ color: C.fg }}>Callify AI</p>
-                        <p className="font-body text-[11px]" style={{ color: C.fgMuted }}>AI Receptionist</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Audio Waveform Visualization ── */}
-                  <div
-                    className="mt-6 rounded-2xl px-4 py-4 flex flex-col items-center gap-2"
-                    style={{ backgroundColor: C.surface, border: `1px solid ${C.border}` }}
+          {/* ── Right Column: Interactive Voice Simulator (Living Acoustic Metaphor) ── */}
+          <div className="lg:col-span-6 flex justify-center">
+            <Reveal delay={0.25} className="w-full max-w-[520px]">
+              {/* Persona Selector Tabs */}
+              <div className="flex items-center justify-between gap-1 p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] mb-4 overflow-x-auto modern-scrollbar">
+                {SCENARIOS.map((sc, idx) => (
+                  <button
+                    key={sc.id}
+                    onClick={() => restartSimulation(idx)}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold font-display transition-all whitespace-nowrap cursor-pointer ${
+                      selectedScenarioIdx === idx
+                        ? "bg-white text-[#0F172A] shadow-sm border border-[#FFC300]/40"
+                        : "text-[#64748B] hover:text-[#0F172A]"
+                    }`}
                   >
-                    <div className="flex items-center gap-2 w-full justify-center mb-1">
-                      <span className="relative flex h-2 w-2">
-                        {activeSpeaker && (
-                          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                        )}
-                        <span className={`relative inline-flex rounded-full h-2 w-2 ${activeSpeaker ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                      </span>
-                      <span className="font-body text-xs font-medium" style={{ color: activeSpeaker ? C.fg : C.fgMuted }}>
-                        {currentSpeakerLabel}
-                      </span>
-                    </div>
-                    <AudioWaveform
-                      isActive={!!activeSpeaker}
-                      color={activeSpeaker === "ai" ? C.accent : activeSpeaker === "customer" ? "#64748B" : C.borderStrong}
-                      barCount={28}
-                      maxHeight={28}
-                      minHeight={3}
-                    />
-                  </div>
-                </div>
+                    {sc.title}
+                  </button>
+                ))}
+              </div>
 
-                {/* ── Live Transcript Panel ── */}
-                <div
-                  className="mx-6 mb-6 rounded-2xl overflow-hidden"
-                  style={{ border: `1px solid ${C.border}` }}
-                >
-                  <div
-                    className="px-4 py-2.5 flex items-center justify-between"
-                    style={{ backgroundColor: C.surface, borderBottom: `1px solid ${C.border}` }}
-                  >
-                    <span className="font-body text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.fgMuted }}>Live Transcript</span>
-                    <span className="relative flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                    </span>
+              {/* 3D Tilt Phone Console */}
+              <TiltCard className="w-full" tiltMax={6}>
+                <div className="relative rounded-[2.5rem] bg-white border border-[#E2E8F0] shadow-[0_25px_80px_-15px_rgba(15,23,42,0.12),0_0_0_1px_rgba(255,255,255,0.8)_inset] overflow-hidden p-6 sm:p-7">
+                  
+                  {/* Speaker / Dynamic Island notch */}
+                  <div className="flex items-center justify-between pb-4 text-[10px] font-mono-data text-[#94A3B8] relative z-10 border-b border-[#F8FAFC]">
+                    <span>11:42</span>
+                    <div className="w-16 h-3 bg-[#F1F5F9] rounded-full flex items-center justify-center gap-1.5 border border-[#E2E8F0]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#CBD5E1]" />
+                      <span className="w-5 h-1 rounded-full bg-[#CBD5E1]" />
+                    </div>
+                    <span className="flex items-center gap-1">5G <span className="w-2 h-2 rounded-full bg-emerald-500" /></span>
                   </div>
-                  <div className="px-4 py-3 space-y-2.5 max-h-[180px] overflow-y-auto modern-scrollbar" style={{ backgroundColor: C.bg }}>
-                    {/* Completed transcript lines */}
-                    {transcriptLines.map((line, i) => (
-                      <div key={i} className="flex gap-2.5">
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                          style={{
-                            backgroundColor: line.speaker === "ai" ? C.accentLight : C.surface,
-                            border: `1px solid ${line.speaker === "ai" ? C.accent + "40" : C.borderStrong}`,
-                          }}
-                        >
-                          {line.speaker === "ai"
-                            ? <Bot size={11} color={C.accentDark} />
-                            : <span className="text-[10px]">👤</span>
-                          }
+
+                  {/* Glowing Top Corner Halos */}
+                  <div className="absolute top-0 right-0 w-44 h-44 bg-[#FFC300]/15 rounded-full blur-2xl pointer-events-none" />
+                  
+                  {/* Phone Header Bar */}
+                  <div className="flex items-center justify-between py-4 border-b border-[#F1F5F9] relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-12 h-12 rounded-2xl bg-[#FFF9E6] border border-[#FFC300]/40 flex items-center justify-center text-xl shadow-sm">
+                          {scenario.avatar}
                         </div>
-                        <div>
-                          <p className="font-body text-[10px] font-semibold mb-0.5" style={{ color: line.speaker === "ai" ? C.accentDark : C.fgMuted }}>
-                            {line.speaker === "ai" ? "Callify AI" : "Customer"}
-                          </p>
-                          <p className="font-body text-xs leading-relaxed" style={{ color: C.fg }}>
-                            "{line.text}"
-                          </p>
+                        {callState === "connected" && (
+                          <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white" />
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-display font-bold text-base text-[#0F172A]">
+                            {scenario.callerName}
+                          </h4>
+                          <span className="text-[10px] font-mono-data bg-[#F1F5F9] px-2 py-0.5 rounded text-[#64748B]">
+                            INBOUND
+                          </span>
+                        </div>
+                        <p className="font-mono-data text-xs text-[#64748B]">
+                          {scenario.callerPhone}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="font-mono-data text-sm font-black text-[#0F172A] bg-[#FFF9E6] px-3 py-1 rounded-lg border border-[#FFC300]/30">
+                        {callState === "ringing" ? "RINGING..." : formatTimer(callSeconds)}
+                      </div>
+                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block mt-1">
+                        ● HD SPEECH ENCRYPTED
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Audio Visualizer & Wave Canvas */}
+                  <div className="py-4 relative z-10">
+                    <div className="flex items-center justify-between text-xs font-semibold text-[#64748B] mb-2 px-1">
+                      <span className="flex items-center gap-1.5">
+                        <Volume2 size={14} className="text-[#FFC300]" />
+                        Living Acoustic Thread Spectrum
+                      </span>
+                      <span className="font-mono-data text-[11px] text-[#E0AB00]">
+                        {isAudioSpeaking ? "AI STREAMING (24kHz)" : "STANDBY"}
+                      </span>
+                    </div>
+
+                    <div className="bg-[#FFFDF5] border border-[#FFC300]/25 rounded-2xl p-2 shadow-inner">
+                      <AcousticVisualizer
+                        isActive={isAudioSpeaking || callState === "connected"}
+                        height={70}
+                        lineColor="#FFC300"
+                        glowColor="rgba(255, 195, 0, 0.45)"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Stream Conversation View */}
+                  <div className="space-y-3 min-h-[160px] max-h-[190px] overflow-y-auto modern-scrollbar py-2 relative z-10">
+                    {scenario.script.slice(0, activeStep).map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`flex gap-2.5 ${msg.speaker === "ai" ? "justify-start" : "justify-end"}`}
+                      >
+                        {msg.speaker === "ai" && (
+                          <div className="w-7 h-7 rounded-lg bg-[#FFC300] flex items-center justify-center text-xs font-bold text-[#0F172A] shrink-0 mt-0.5">
+                            AI
+                          </div>
+                        )}
+                        <div
+                          className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-body max-w-[85%] leading-relaxed ${
+                            msg.speaker === "ai"
+                              ? "bg-[#FFF9E6] border border-[#FFC300]/30 text-[#0F172A]"
+                              : "bg-[#F1F5F9] text-[#0F172A] font-medium"
+                          }`}
+                        >
+                          {msg.text}
                         </div>
                       </div>
                     ))}
 
-                    {/* Currently typing line */}
-                    {activeSpeaker && displayedText && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex gap-2.5"
+                    {/* Active Typing / Streaming Bubble */}
+                    {displayedText && (
+                      <div
+                        className={`flex gap-2.5 ${
+                          scenario.script[activeStep]?.speaker === "ai" ? "justify-start" : "justify-end"
+                        }`}
                       >
+                        {scenario.script[activeStep]?.speaker === "ai" && (
+                          <div className="w-7 h-7 rounded-lg bg-[#FFC300] flex items-center justify-center text-xs font-bold text-[#0F172A] shrink-0 mt-0.5">
+                            AI
+                          </div>
+                        )}
                         <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                          style={{
-                            backgroundColor: activeSpeaker === "ai" ? C.accentLight : C.surface,
-                            border: `1px solid ${activeSpeaker === "ai" ? C.accent + "40" : C.borderStrong}`,
-                          }}
+                          className={`rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-body max-w-[85%] leading-relaxed ${
+                            scenario.script[activeStep]?.speaker === "ai"
+                              ? "bg-[#FFF9E6] border border-[#FFC300]/40 text-[#0F172A] shadow-sm"
+                              : "bg-[#F1F5F9] text-[#0F172A]"
+                          }`}
                         >
-                          {activeSpeaker === "ai"
-                            ? <Bot size={11} color={C.accentDark} />
-                            : <span className="text-[10px]">👤</span>
-                          }
+                          {displayedText}
+                          <span className="inline-block w-1.5 h-3.5 bg-[#E0AB00] ml-1 animate-pulse" />
                         </div>
-                        <div>
-                          <p className="font-body text-[10px] font-semibold mb-0.5" style={{ color: activeSpeaker === "ai" ? C.accentDark : C.fgMuted }}>
-                            {activeSpeaker === "ai" ? "Callify AI" : "Customer"}
-                          </p>
-                          <p className="font-body text-xs leading-relaxed" style={{ color: C.fg }}>
-                            "{displayedText}"
-                            <motion.span
-                              animate={{ opacity: [1, 0] }}
-                              transition={{ duration: 0.5, repeat: Infinity }}
-                              className="inline-block w-0.5 h-3.5 ml-0.5 rounded-full align-middle"
-                              style={{ backgroundColor: C.accent }}
-                            />
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Idle state */}
-                    {transcriptLines.length === 0 && !activeSpeaker && (
-                      <div className="flex items-center justify-center py-4">
-                        <motion.div
-                          animate={{ opacity: [0.3, 0.8, 0.3] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                          className="flex items-center gap-2"
-                        >
-                          <Phone size={14} color={C.fgMuted} />
-                          <span className="font-body text-xs" style={{ color: C.fgMuted }}>Connecting call...</span>
-                        </motion.div>
                       </div>
                     )}
                   </div>
+
+                  {/* Instant Telemetry / Booking Popout */}
+                  <div className="mt-4 pt-4 border-t border-[#F1F5F9] relative z-10">
+                    <div className="flex items-center justify-between bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                          <CheckCircle2 size={20} />
+                        </div>
+                        <div>
+                          <p className="font-display text-xs font-bold text-[#0F172A]">
+                            {scenario.bookingResult.type}
+                          </p>
+                          <p className="text-[11px] text-[#64748B] font-mono-data">
+                            {scenario.bookingResult.slot} • {scenario.bookingResult.doctor}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => restartSimulation()}
+                        className="p-2 text-xs font-display font-semibold text-[#0F172A] bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] rounded-xl flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Replay Call"
+                      >
+                        <Rocket size={14} className="text-[#FFC300]" />
+                        <span>Replay</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bottom Console Controls */}
+                  <div className="mt-5 flex items-center justify-between text-xs text-[#64748B] relative z-10">
+                    <span className="flex items-center gap-1.5 font-mono-data">
+                      <ShieldCheck size={14} className="text-emerald-500" />
+                      Twilio / Exotel Carrier Link Active
+                    </span>
+                    <button
+                      onClick={onNavigateToAuth}
+                      className="font-bold text-[#E0AB00] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      Configure your prompt <ChevronRight size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </Reveal>
+              </TiltCard>
+            </Reveal>
+          </div>
+
         </div>
       </div>
     </section>
@@ -714,59 +664,47 @@ function HeroSection({ onNavigateToAuth }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   TRUSTED BY SECTION
+   3. LOGO MARQUEE & ENTERPRISE TRUST TICKER
    ═══════════════════════════════════════════════════════════════════════════════ */
 function TrustedBySection() {
-  const industries = [
-    "Dental Clinics",
-    "Beauty Salons",
-    "Law Firms",
-    "Hotels & Resorts",
-    "Real Estate",
-    "Hospitals",
-    "Auto Dealerships",
-    "Fitness Studios",
-    "CA Firms",
-    "Restaurants",
-    "Dental Clinics",
-    "Beauty Salons",
-    "Law Firms",
-    "Hotels & Resorts",
-    "Real Estate",
-    "Hospitals",
-    "Auto Dealerships",
-    "Fitness Studios",
-    "CA Firms",
-    "Restaurants",
+  const brands = [
+    { name: "Apollo Clinics", cat: "Healthcare", badge: "24/7 Triage" },
+    { name: "DLF Cybercity", cat: "Real Estate", badge: "Lease Inquiry" },
+    { name: "Kaya Skin Clinic", cat: "Wellness", badge: "Appt Booking" },
+    { name: "Honda City Auto", cat: "Automotive", badge: "Service Valet" },
+    { name: "Lenskart Studio", cat: "Retail", badge: "Store Directions" },
+    { name: "Urban Company Pro", cat: "Home Services", badge: "Dispatch" },
+    { name: "Fortis Diagnostics", cat: "Labs", badge: "Home Collection" },
   ];
 
   return (
-    <section className="py-12 border-y" style={{ backgroundColor: C.surface, borderColor: C.border }}>
-      <div className="mx-auto max-w-7xl px-6">
-        <p className="text-center font-body text-sm font-medium mb-8" style={{ color: C.fgMuted }}>
-          Trusted by <span className="font-bold" style={{ color: C.fg }}>5,000+</span> businesses across India
+    <section className="py-12 border-y border-[#F1F5F9] bg-[#FAFAFA] overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 mb-6 text-center">
+        <p className="text-xs font-mono-data font-bold uppercase tracking-widest text-[#64748B]">
+          POWERING INBOUND TELEPHONY FOR 5,000+ FAST-GROWING BUSINESSES
         </p>
-        <div className="overflow-hidden relative">
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-[#FAFAFA] to-transparent z-10" />
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#FAFAFA] to-transparent z-10" />
-          <div className="flex animate-marquee whitespace-nowrap">
-            {industries.map((name, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 mx-8 flex-shrink-0"
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.accentLight }}>
-                  <Users size={14} color={C.accentDark} />
-                </div>
-                <span
-                  className="font-display text-sm font-semibold whitespace-nowrap"
-                  style={{ color: C.fgMuted }}
-                >
-                  {name}
-                </span>
-              </div>
-            ))}
-          </div>
+      </div>
+
+      <div className="relative w-full overflow-hidden whitespace-nowrap">
+        {/* Ambient fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#FAFAFA] to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#FAFAFA] to-transparent z-10 pointer-events-none" />
+
+        <div className="inline-flex gap-8 animate-marquee">
+          {[...brands, ...brands].map((b, idx) => (
+            <div
+              key={idx}
+              className="inline-flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-2xl px-5 py-2.5 shadow-sm"
+            >
+              <div className="w-2.5 h-2.5 rounded-full bg-[#FFC300]" />
+              <span className="font-display font-bold text-sm text-[#0F172A]">{b.name}</span>
+              <span className="text-xs text-[#94A3B8]">•</span>
+              <span className="text-xs text-[#64748B] font-mono-data">{b.cat}</span>
+              <span className="text-[10px] bg-[#FFF9E6] text-[#E0AB00] font-bold px-2 py-0.5 rounded border border-[#FFC300]/20">
+                {b.badge}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -774,246 +712,399 @@ function TrustedBySection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   STATS BAR
-   ═══════════════════════════════════════════════════════════════════════════════ */
-function StatsBar() {
-  const stats = [
-    { value: "5,000+", label: "Indian Businesses" },
-    { value: "10L+", label: "Calls Answered" },
-    { value: "99.9%", label: "Uptime SLA" },
-    { value: "₹2", label: "Avg Cost / Call", icon: null },
-  ];
-
-  return (
-    <section className="py-16" style={{ backgroundColor: C.bg }}>
-      <div className="mx-auto max-w-5xl px-6">
-        <Reveal>
-          <div
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 rounded-3xl px-8 py-10"
-            style={{
-              backgroundColor: C.surface,
-              border: `1px solid ${C.border}`,
-              boxShadow: "0 4px 24px rgba(15,23,42,0.04)",
-            }}
-          >
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="flex items-center justify-center gap-1.5">
-                  <span className="font-display text-3xl md:text-4xl font-bold" style={{ color: C.fg }}>
-                    {stat.value}
-                  </span>
-                </div>
-                <span className="font-body text-sm mt-1 block" style={{ color: C.fgMuted }}>
-                  {stat.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   FEATURES SECTION
-   ═══════════════════════════════════════════════════════════════════════════════ */
-const FEATURES = [
-  {
-    icon: Phone,
-    title: "24/7 Call Answering",
-    description:
-      "Never lose a lead again. Callify picks up every call instantly with a warm, natural greeting — day or night, weekends and public holidays included.",
-  },
-  {
-    icon: CalendarCheck,
-    title: "Smart Scheduling",
-    description:
-      "Syncs with Google Calendar, Calendly, and Practo. Your AI receptionist books, reschedules, and confirms appointments autonomously.",
-  },
-  {
-    icon: Globe,
-    title: "Hindi + 12 Languages",
-    description:
-      "Speak to your customers in Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, and more. Callify auto-detects language and switches seamlessly.",
-  },
-  {
-    icon: MessageSquare,
-    title: "WhatsApp Integration",
-    description:
-      "Send appointment confirmations, follow-ups, and receipts directly to your customer's WhatsApp. Deeply integrated with WhatsApp Business API.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "TRAI Compliant",
-    description:
-      "Fully compliant with TRAI regulations and Indian data protection laws. All calls are encrypted and your data stays in Indian data centres.",
-  },
-  {
-    icon: BarChart3,
-    title: "Real-Time Analytics",
-    description:
-      "Track call volume, resolution rates, peak hours, and customer sentiment — all from a beautiful, real-time dashboard built for Indian time zones.",
-  },
-];
-
-function FeatureCard({ feature, index }) {
-  const Icon = feature.icon;
-  return (
-    <motion.div
-      variants={fadeUp}
-      custom={index}
-      whileHover={{
-        y: -6,
-        boxShadow: "0 20px 40px rgba(255,195,0,0.08), 0 8px 16px rgba(15,23,42,0.04)",
-      }}
-      className="group relative rounded-2xl p-8 transition-all duration-300 cursor-default"
-      style={{
-        backgroundColor: C.bg,
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 4px 20px rgba(15,23,42,0.04)",
-      }}
-    >
-      <div
-        className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl transition-colors duration-300 group-hover:bg-[#FFC300]/20"
-        style={{ backgroundColor: C.accentLight }}
-      >
-        <Icon size={22} color={C.accent} strokeWidth={2} />
-      </div>
-      <h3 className="font-display text-lg font-bold mb-2" style={{ color: C.fg }}>
-        {feature.title}
-      </h3>
-      <p className="font-body text-sm leading-relaxed" style={{ color: C.fgMuted }}>
-        {feature.description}
-      </p>
-    </motion.div>
-  );
-}
-
-function FeaturesSection() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-
-  return (
-    <section id="features" className="relative py-24 md:py-32" style={{ backgroundColor: C.surface }}>
-      <div className="mx-auto max-w-7xl px-6">
-        <Reveal>
-          <div className="mx-auto max-w-2xl text-center mb-16">
-            <SectionBadge icon={Zap}>Powerful Features</SectionBadge>
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight" style={{ color: C.fg }}>
-              Everything You Need to{" "}
-              <span style={{ color: C.accent }}>Automate</span> Your Front Desk
-            </h2>
-            <p className="font-body mt-4 text-lg" style={{ color: C.fgMuted }}>
-              From call handling to appointment booking, Callify covers every
-              aspect of your customer communication.
-            </p>
-          </div>
-        </Reveal>
-
-        <motion.div
-          ref={ref}
-          variants={staggerContainer}
-          initial="hidden"
-          animate={inView ? "visible" : "hidden"}
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-        >
-          {FEATURES.map((feature, i) => (
-            <FeatureCard key={feature.title} feature={feature} index={i} />
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   HOW IT WORKS
+   4. ARCHITECTURE & HOW IT WORKS (3-STEP ACOUSTIC PIPELINE)
    ═══════════════════════════════════════════════════════════════════════════════ */
 function HowItWorksSection() {
   const steps = [
     {
-      icon: Plug,
-      number: "01",
-      title: "Connect Your Number",
-      description:
-        "Link your existing business phone number or get a new virtual number. Setup takes under 2 minutes — no hardware needed.",
+      num: "01",
+      title: "Telephony Carrier Ingestion",
+      desc: "Connect your existing Airtel, Jio, Exotel, or Twilio phone number in 60 seconds with unconditional forward.",
+      icon: PhoneCall,
+      detail: "Zero hardware or SIM cards needed. Runs on carrier-grade SIP trunks.",
     },
     {
-      icon: Settings2,
-      number: "02",
-      title: "Customize Your AI",
-      description:
-        "Tell Callify about your business, services, pricing, and operating hours. Train it with your FAQs and preferred greeting style.",
+      num: "02",
+      title: "Neural Intent & Multilingual Whisper",
+      desc: "Instant real-time speech recognition tuned specifically for Indian regional accents, colloquial phrasing, and background noise.",
+      icon: BrainCircuit,
+      detail: "Processes Hindi, English, Hinglish, Tamil, Marathi, and Kannada concurrently.",
     },
     {
-      icon: Rocket,
-      number: "03",
-      title: "Go Live Instantly",
-      description:
-        "That's it! Your AI receptionist starts answering calls immediately. Monitor everything from your real-time dashboard.",
+      num: "03",
+      title: "Action Execution & WhatsApp Dispatch",
+      desc: "Callify directly books slots in Google Calendar, updates your CRM, and dispatches an instant WhatsApp confirmation pin to the caller.",
+      icon: CalendarCheck,
+      detail: "Instant webhook triggers to Zapier, Zoho, Salesforce, or custom REST APIs.",
     },
   ];
 
   return (
-    <section
-      id="how-it-works"
-      className="py-24 md:py-32"
-      style={{ backgroundColor: C.bg }}
-    >
-      <div className="mx-auto max-w-7xl px-6">
-        <Reveal>
-          <div className="mx-auto max-w-2xl text-center mb-16">
-            <SectionBadge icon={Clock}>Quick Setup</SectionBadge>
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight" style={{ color: C.fg }}>
-              Go Live in{" "}
-              <span style={{ color: C.accent }}>3 Simple Steps</span>
-            </h2>
-            <p className="font-body mt-4 text-lg" style={{ color: C.fgMuted }}>
-              No technical expertise required. Get your AI receptionist up and
-              running in under 5 minutes.
-            </p>
-          </div>
-        </Reveal>
+    <section id="how-it-works" className="py-28 px-6 bg-white relative">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <SectionBadge icon={Cpu}>Acoustic Pipeline Architecture</SectionBadge>
+          <h2 className="font-display text-4xl sm:text-5xl font-black text-[#0F172A] tracking-tight descender-safe">
+            How Callify Answers in{" "}
+            <HighlightedWord>&lt; 420 Milliseconds</HighlightedWord>
+          </h2>
+          <p className="font-body text-lg text-[#64748B] mt-4">
+            A seamless three-stage voice pipeline engineered for ultra-low latency, human-grade empathy, and automated execution.
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <Reveal key={step.number} delay={i * 0.15}>
-                <div className="relative text-center group">
-                  {/* Connector line */}
-                  {i < steps.length - 1 && (
-                    <div
-                      className="hidden md:block absolute top-16 left-[60%] w-[80%] h-px"
-                      style={{ backgroundColor: C.borderStrong }}
-                    />
-                  )}
-
-                  {/* Icon circle */}
-                  <div className="relative inline-flex mb-6">
-                    <div
-                      className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow duration-300"
-                      style={{ backgroundColor: C.accent }}
-                    >
-                      <Icon size={32} color={C.fg} strokeWidth={1.5} />
-                    </div>
-                    <span
-                      className="absolute -top-2 -right-2 w-7 h-7 rounded-full font-display text-xs font-bold flex items-center justify-center shadow-md"
-                      style={{ backgroundColor: C.fg, color: "#fff" }}
-                    >
-                      {step.number}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+          {steps.map((step) => (
+            <TiltCard key={step.num} tiltMax={8}>
+              <div className="h-full bg-[#FAFAFA] rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between hover:border-[#FFC300]/50 transition-colors group">
+                <div>
+                  <div className="flex items-center justify-between mb-8">
+                    <span className="font-mono-data text-4xl font-black text-[#E2E8F0] group-hover:text-[#FFC300] transition-colors">
+                      {step.num}
                     </span>
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-[#E2E8F0] flex items-center justify-center shadow-sm text-[#0F172A] group-hover:bg-[#FFC300] transition-colors">
+                      <step.icon size={22} />
+                    </div>
                   </div>
 
-                  <h3 className="font-display text-xl font-bold mb-3" style={{ color: C.fg }}>
+                  <h3 className="font-display text-xl font-bold text-[#0F172A] mb-3">
                     {step.title}
                   </h3>
-                  <p className="font-body text-sm leading-relaxed max-w-xs mx-auto" style={{ color: C.fgMuted }}>
-                    {step.description}
+                  <p className="font-body text-sm text-[#64748B] leading-relaxed mb-6">
+                    {step.desc}
                   </p>
                 </div>
-              </Reveal>
+
+                <div className="pt-4 border-t border-[#E2E8F0] text-xs font-mono-data text-[#0F172A] bg-white p-3 rounded-xl border">
+                  ⚡ {step.detail}
+                </div>
+              </div>
+            </TiltCard>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   5. BENTO GRID FEATURES SECTION
+   ═══════════════════════════════════════════════════════════════════════════════ */
+function FeaturesSection() {
+  return (
+    <section id="features" className="py-28 px-6 bg-[#FAFAFA] relative">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <SectionBadge icon={Layers}>Enterprise Capabilities</SectionBadge>
+          <h2 className="font-display text-4xl sm:text-5xl font-black text-[#0F172A] tracking-tight descender-safe">
+            Engineered for Real-World{" "}
+            <HighlightedWord>Business Telephony</HighlightedWord>
+          </h2>
+          <p className="font-body text-lg text-[#64748B] mt-4">
+            Everything your business needs to turn missed calls into paying customers, 24 hours a day, 365 days a year.
+          </p>
+        </div>
+
+        {/* Bento Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          
+          {/* Card 1: 24/7 Booking Engine (Large) */}
+          <div className="md:col-span-8">
+            <TiltCard tiltMax={6} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 md:p-10 flex flex-col justify-between shadow-sm">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF9E6] border border-[#FFC300]/40 flex items-center justify-center mb-6 text-[#E0AB00]">
+                    <CalendarCheck size={24} />
+                  </div>
+                  <h3 className="font-display text-2xl font-bold text-[#0F172A] mb-3">
+                    Autonomous 2-Way Calendar Booking
+                  </h3>
+                  <p className="font-body text-[#64748B] max-w-xl text-base leading-relaxed">
+                    Callify reads real-time busy/free times from Google Calendar, Outlook, or your custom CRM. It negotiates mutually open slots with callers, handles complex reschedulings, and blocks double-bookings.
+                  </p>
+                </div>
+
+                {/* Visual Preview */}
+                <div className="mt-8 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="font-mono-data text-xs font-bold text-[#0F172A]">
+                      LIVE SYNC: GOOGLE CALENDAR & ZOHO CRM
+                    </span>
+                  </div>
+                  <span className="text-xs bg-white px-3 py-1 rounded-lg border text-[#64748B] font-mono-data">
+                    0 Conflict Collision Rate
+                  </span>
+                </div>
+              </div>
+            </TiltCard>
+          </div>
+
+          {/* Card 2: 12+ Indian Languages (Medium) */}
+          <div className="md:col-span-4">
+            <TiltCard tiltMax={7} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between shadow-sm">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF9E6] border border-[#FFC300]/40 flex items-center justify-center mb-6 text-[#E0AB00]">
+                    <Globe size={24} />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-[#0F172A] mb-2">
+                    Multilingual Native Fluency
+                  </h3>
+                  <p className="font-body text-sm text-[#64748B] leading-relaxed">
+                    Smoothly understands Hinglish, pure Hindi, Tamil, Telugu, Marathi, and Indian-accented English without getting confused.
+                  </p>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {["Hindi", "English", "Hinglish", "Tamil", "Marathi", "Gujarati"].map((lang) => (
+                    <span
+                      key={lang}
+                      className="text-xs font-medium font-mono-data bg-[#FAFAFA] border border-[#E2E8F0] px-3 py-1 rounded-lg text-[#0F172A]"
+                    >
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </TiltCard>
+          </div>
+
+          {/* Card 3: WhatsApp Automation */}
+          <div className="md:col-span-4">
+            <TiltCard tiltMax={7} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between shadow-sm">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-6 text-emerald-600">
+                    <MessageSquare size={24} />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-[#0F172A] mb-2">
+                    Instant WhatsApp Dispatch
+                  </h3>
+                  <p className="font-body text-sm text-[#64748B] leading-relaxed">
+                    As soon as a call ends, Callify dispatches a branded WhatsApp template with meeting time, Google Maps location, and prep instructions.
+                  </p>
+                </div>
+                <div className="mt-6 p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl text-xs font-mono-data text-emerald-800">
+                  ✓ 98.4% WhatsApp delivery within 3s
+                </div>
+              </div>
+            </TiltCard>
+          </div>
+
+          {/* Card 4: Human Escalation & Fallback */}
+          <div className="md:col-span-4">
+            <TiltCard tiltMax={7} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between shadow-sm">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 text-amber-600">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-[#0F172A] mb-2">
+                    Warm Human Transfer
+                  </h3>
+                  <p className="font-body text-sm text-[#64748B] leading-relaxed">
+                    For VIP callers or critical emergencies, Callify instantly rings through to your personal phone while whispering context into your ear.
+                  </p>
+                </div>
+                <div className="mt-6 p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-mono-data text-[#0F172A]">
+                  Transfer latency: &lt; 1.8 seconds
+                </div>
+              </div>
+            </TiltCard>
+          </div>
+
+          {/* Card 5: Full Analytics & Call Recordings */}
+          <div className="md:col-span-4">
+            <TiltCard tiltMax={7} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between shadow-sm">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[#FFF9E6] border border-[#FFC300]/40 flex items-center justify-center mb-6 text-[#E0AB00]">
+                    <BarChart3 size={24} />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-[#0F172A] mb-2">
+                    Transcripts & Sentiment
+                  </h3>
+                  <p className="font-body text-sm text-[#64748B] leading-relaxed">
+                    Every call is transcribed with audio recordings, caller intent tags, sentiment scores, and revenue opportunity metrics.
+                  </p>
+                </div>
+                <div className="mt-6 p-3 bg-[#FFF9E6] border border-[#FFC300]/30 rounded-xl text-xs font-mono-data text-[#0F172A]">
+                  SOC2 Type II & HIPAA compliant storage
+                </div>
+              </div>
+            </TiltCard>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   6. PRICING SECTION
+   ═══════════════════════════════════════════════════════════════════════════════ */
+function PricingSection({ onNavigateToAuth }) {
+  const [billingCycle, setBillingCycle] = useState("annual"); // 'monthly' | 'annual'
+
+  const plans = [
+    {
+      name: "Starter Clinic / Studio",
+      desc: "Perfect for single-doctor clinics, boutique salons, and growing local businesses.",
+      priceMonthly: 3499,
+      priceAnnual: 2799,
+      calls: "Up to 300 calls / month",
+      popular: false,
+      features: [
+        "1 Phone Number Ingestion",
+        "24/7 Autonomous Booking",
+        "Hindi + English Fluency",
+        "Google Calendar Integration",
+        "WhatsApp Notification Dispatch",
+        "Email Support within 4 hours",
+      ],
+    },
+    {
+      name: "Business Growth",
+      desc: "For high-volume multi-chair clinics, busy auto centers, and real estate brokerages.",
+      priceMonthly: 7999,
+      priceAnnual: 6399,
+      calls: "Up to 1,200 calls / month",
+      popular: true,
+      features: [
+        "Up to 3 Phone Lines",
+        "12+ Indian Regional Languages",
+        "Warm Human Call Transfer",
+        "Custom Voice Persona & Pitch",
+        "Full Audio Transcripts & Recording",
+        "Zoho / Salesforce / Custom Webhooks",
+        "Priority 24/7 WhatsApp VIP Support",
+      ],
+    },
+    {
+      name: "Enterprise Multi-Branch",
+      desc: "For hospital chains, retail networks, and multi-city service franchises.",
+      priceMonthly: 19999,
+      priceAnnual: 15999,
+      calls: "Unlimited Call Channels",
+      popular: false,
+      features: [
+        "Unlimited Multi-Branch Routing",
+        "Custom LLM Fine-Tuned on your SOPs",
+        "Dedicated Telephony Account Manager",
+        "Custom SLA (99.95% Guaranteed)",
+        "On-Premise Data Retention & HIPAA",
+        "Custom SIP Trunk Integration",
+      ],
+    },
+  ];
+
+  return (
+    <section id="pricing" className="py-28 px-6 bg-white relative">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <SectionBadge icon={Zap}>Transparent Investment</SectionBadge>
+          <h2 className="font-display text-4xl sm:text-5xl font-black text-[#0F172A] tracking-tight descender-safe">
+            Less Than 10% the Cost of a{" "}
+            <HighlightedWord>Full-Time Receptionist</HighlightedWord>
+          </h2>
+          <p className="font-body text-lg text-[#64748B] mt-4">
+            Zero hiring hassles, zero sick days, zero missed night calls. Cancel or adjust anytime.
+          </p>
+
+          {/* Billing Switcher */}
+          <div className="mt-8 inline-flex items-center p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0]">
+            <button
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-5 py-2 rounded-xl text-xs font-bold font-display cursor-pointer transition-all ${
+                billingCycle === "monthly"
+                  ? "bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]"
+                  : "text-[#64748B] hover:text-[#0F172A]"
+              }`}
+            >
+              Monthly Billing
+            </button>
+            <button
+              onClick={() => setBillingCycle("annual")}
+              className={`px-5 py-2 rounded-xl text-xs font-bold font-display cursor-pointer transition-all flex items-center gap-1.5 ${
+                billingCycle === "annual"
+                  ? "bg-[#0F172A] text-white shadow-sm"
+                  : "text-[#64748B] hover:text-[#0F172A]"
+              }`}
+            >
+              <span>Annual Billing</span>
+              <span className="text-[10px] bg-[#FFC300] text-[#0F172A] font-extrabold px-1.5 py-0.5 rounded">
+                SAVE 20%
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+          {plans.map((plan) => {
+            const price = billingCycle === "annual" ? plan.priceAnnual : plan.priceMonthly;
+
+            return (
+              <TiltCard key={plan.name} tiltMax={6} className="h-full">
+                <div
+                  className={`h-full rounded-3xl p-8 flex flex-col justify-between transition-all relative ${
+                    plan.popular
+                      ? "bg-gradient-to-b from-[#FFFDF5] to-white border-2 border-[#FFC300] shadow-[0_12px_40px_rgba(255,195,0,0.18)]"
+                      : "bg-[#FAFAFA] border border-[#E2E8F0] shadow-sm"
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0F172A] text-[#FFC300] px-4 py-1 rounded-full text-xs font-bold font-mono-data tracking-wider uppercase border border-[#FFC300]/40">
+                      ★ MOST POPULAR CHOICE
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="font-display text-xl font-bold text-[#0F172A] mb-1">
+                      {plan.name}
+                    </h3>
+                    <p className="font-body text-xs text-[#64748B] min-h-[36px] mb-6">
+                      {plan.desc}
+                    </p>
+
+                    {/* Price */}
+                    <div className="mb-6 pb-6 border-b border-[#F1F5F9]">
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-display text-4xl sm:text-5xl font-black text-[#0F172A]">
+                          ₹{price.toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-xs font-semibold text-[#64748B]">/ month</span>
+                      </div>
+                      <span className="text-xs font-mono-data font-semibold text-[#E0AB00] mt-1 block">
+                        {plan.calls}
+                      </span>
+                    </div>
+
+                    {/* Features List */}
+                    <div className="space-y-3 mb-8">
+                      {plan.features.map((feat) => (
+                        <div key={feat} className="flex items-start gap-2.5 text-xs text-[#0F172A]">
+                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <MagneticButton
+                    onClick={onNavigateToAuth}
+                    className={`w-full py-3.5 rounded-xl text-xs font-bold tracking-wide ${
+                      plan.popular
+                        ? "bg-[#0F172A] text-[#FFC300] hover:bg-[#1E293B]"
+                        : "bg-white text-[#0F172A] border border-[#E2E8F0] hover:bg-[#F1F5F9]"
+                    }`}
+                  >
+                    Start 14-Day Free Pilot
+                  </MagneticButton>
+                </div>
+              </TiltCard>
             );
           })}
         </div>
@@ -1023,254 +1114,72 @@ function HowItWorksSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   PRICING SECTION
-   ═══════════════════════════════════════════════════════════════════════════════ */
-function PricingSection({ onNavigateToAuth }) {
-  const plans = [
-    {
-      name: "Starter",
-      price: "₹1,999",
-      period: "/month",
-      description: "Perfect for small clinics, salons & solo professionals",
-      featured: false,
-      features: [
-        "Up to 200 calls/month",
-        "1 Phone number",
-        "Hindi + English support",
-        "Google Calendar sync",
-        "WhatsApp notifications",
-        "Email support",
-      ],
-    },
-    {
-      name: "Professional",
-      price: "₹4,999",
-      period: "/month",
-      description: "Ideal for growing businesses & multi-location brands",
-      featured: true,
-      features: [
-        "Up to 1,000 calls/month",
-        "3 Phone numbers",
-        "12+ Indian languages",
-        "All calendar integrations",
-        "WhatsApp Business API",
-        "CRM integration",
-        "Priority support",
-        "Custom AI training",
-      ],
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      period: "",
-      description: "For large organisations with custom requirements",
-      featured: false,
-      features: [
-        "Unlimited calls",
-        "Unlimited numbers",
-        "All languages",
-        "Custom integrations",
-        "Dedicated account manager",
-        "SLA guarantee",
-        "On-premise option",
-        "White-label available",
-      ],
-    },
-  ];
-
-  return (
-    <section id="pricing" className="py-24 md:py-32" style={{ backgroundColor: C.surface }}>
-      <div className="mx-auto max-w-7xl px-6">
-        <Reveal>
-          <div className="mx-auto max-w-2xl text-center mb-16">
-            <SectionBadge icon={IndianRupee}>Simple Pricing</SectionBadge>
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight" style={{ color: C.fg }}>
-              Plans That{" "}
-              <span style={{ color: C.accent }}>Scale</span> With You
-            </h2>
-            <p className="font-body mt-4 text-lg" style={{ color: C.fgMuted }}>
-              Start free for 14 days. No credit card required.
-              All prices are in INR exclusive of GST.
-            </p>
-          </div>
-        </Reveal>
-
-        <div className="grid md:grid-cols-3 gap-8 items-start">
-          {plans.map((plan, i) => (
-            <Reveal key={plan.name} delay={i * 0.12}>
-              <div
-                className={`relative rounded-3xl p-8 transition-all duration-300 ${
-                  plan.featured
-                    ? "shadow-xl scale-[1.02] md:scale-105"
-                    : "shadow-md hover:shadow-lg"
-                }`}
-                style={{
-                  backgroundColor: plan.featured ? C.fg : C.bg,
-                  border: plan.featured ? "none" : `1px solid ${C.border}`,
-                }}
-              >
-                {plan.featured && (
-                  <span
-                    className="absolute -top-3.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full px-4 py-1 text-xs font-bold font-display shadow-md"
-                    style={{ backgroundColor: C.accent, color: C.fg }}
-                  >
-                    <Star size={12} fill={C.fg} /> Most Popular
-                  </span>
-                )}
-
-                <h3
-                  className="font-display text-xl font-bold"
-                  style={{ color: plan.featured ? "#fff" : C.fg }}
-                >
-                  {plan.name}
-                </h3>
-                <p
-                  className="font-body text-sm mt-1"
-                  style={{ color: plan.featured ? "rgba(255,255,255,0.6)" : C.fgMuted }}
-                >
-                  {plan.description}
-                </p>
-
-                <div className="mt-6 mb-8">
-                  <span
-                    className="font-display text-4xl font-bold"
-                    style={{ color: plan.featured ? C.accent : C.fg }}
-                  >
-                    {plan.price}
-                  </span>
-                  <span
-                    className="font-body text-base ml-1"
-                    style={{ color: plan.featured ? "rgba(255,255,255,0.5)" : C.fgMuted }}
-                  >
-                    {plan.period}
-                  </span>
-                </div>
-
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-3">
-                      <Check
-                        size={16}
-                        color={plan.featured ? C.accent : "#22C55E"}
-                        strokeWidth={2.5}
-                      />
-                      <span
-                        className="font-body text-sm"
-                        style={{ color: plan.featured ? "rgba(255,255,255,0.8)" : C.fgMuted }}
-                      >
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                <motion.button
-                  onClick={onNavigateToAuth}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="w-full rounded-full py-3.5 text-sm font-semibold font-body cursor-pointer border-none transition-all"
-                  style={{
-                    backgroundColor: plan.featured ? C.accent : C.accentLight,
-                    color: C.fg,
-                    boxShadow: plan.featured
-                      ? "0 4px 14px rgba(255,195,0,0.3)"
-                      : "none",
-                  }}
-                >
-                  {plan.name === "Enterprise" ? "Contact Sales" : "Start Free Trial"}
-                </motion.button>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   TESTIMONIALS
+   7. TESTIMONIALS WALL
    ═══════════════════════════════════════════════════════════════════════════════ */
 function TestimonialsSection() {
   const testimonials = [
     {
-      name: "Dr. Priya Sharma",
-      role: "Owner, Smile Dental Clinic, Mumbai",
-      text: "Callify has been a game-changer for our clinic. We used to miss 30% of patient calls during procedures. Now every call is answered, appointments are booked, and patients love the Hindi + English support!",
-      rating: 5,
+      name: "Dr. Ananya Iyer",
+      role: "Founder, SmileCraft Dental Hospital",
+      city: "Bengaluru",
+      quote: "Before Callify, our front desk missed at least 6 to 8 calls every evening after our clinic closed. Now Callify answers every single patient, books the slot on our calendar, and sends them clinic directions. It paid for itself on day two.",
+      stars: 5,
     },
     {
-      name: "Rajesh Mehta",
-      role: "Founder, Luxe Salon Chain, Delhi NCR",
-      text: "We deployed Callify across our 8 salon locations. The ROI was immediate — our booking rate went up 45% in the first month, and we no longer need a full-time receptionist at each branch.",
-      rating: 5,
+      name: "Rajesh Singhania",
+      role: "Managing Director, Apex Real Estate",
+      city: "Gurugram",
+      quote: "When we run newspaper ads or digital campaigns, our phones blow up with 200 calls in an hour. No human receptionist can handle that queue. Callify took 14 calls concurrently without a second of wait time.",
+      stars: 5,
     },
     {
-      name: "Advocate Sneha Iyer",
-      role: "Partner, Iyer & Associates, Bangalore",
-      text: "As a law firm, we can't afford to miss potential client calls. Callify filters spam, handles initial inquiries, and routes urgent matters to me directly. The WhatsApp integration is brilliant!",
-      rating: 5,
+      name: "Karan Johar",
+      role: "Owner, Velvet Glow Luxury Salons",
+      city: "Mumbai",
+      quote: "The Hinglish pronunciation is unbelievable. Our clients don't even realize they are speaking with an AI. It politely handles rescheduling and sends WhatsApp reminders automatically.",
+      stars: 5,
     },
   ];
 
   return (
-    <section id="testimonials" className="py-24 md:py-32" style={{ backgroundColor: C.bg }}>
-      <div className="mx-auto max-w-7xl px-6">
-        <Reveal>
-          <div className="mx-auto max-w-2xl text-center mb-16">
-            <SectionBadge icon={Quote}>Customer Love</SectionBadge>
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight" style={{ color: C.fg }}>
-              Trusted by{" "}
-              <span style={{ color: C.accent }}>India's Best</span> Businesses
-            </h2>
-            <p className="font-body mt-4 text-lg" style={{ color: C.fgMuted }}>
-              See what business owners across India are saying about Callify.
-            </p>
-          </div>
-        </Reveal>
+    <section className="py-28 px-6 bg-[#FAFAFA] relative">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center max-w-3xl mx-auto mb-20">
+          <SectionBadge icon={Star}>Verified Impact</SectionBadge>
+          <h2 className="font-display text-4xl sm:text-5xl font-black text-[#0F172A] tracking-tight descender-safe">
+            Loved by Over{" "}
+            <HighlightedWord>5,000+ Indian Owners</HighlightedWord>
+          </h2>
+          <p className="font-body text-lg text-[#64748B] mt-4">
+            Hear how healthcare clinics, service centers, and professional practices eliminated missed calls permanently.
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((t, i) => (
-            <Reveal key={t.name} delay={i * 0.12}>
-              <div
-                className="rounded-2xl p-8 h-full flex flex-col justify-between"
-                style={{
-                  backgroundColor: C.surface,
-                  border: `1px solid ${C.border}`,
-                  boxShadow: "0 4px 20px rgba(15,23,42,0.04)",
-                }}
-              >
-                {/* Stars */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {testimonials.map((t, idx) => (
+            <TiltCard key={idx} tiltMax={6} className="h-full">
+              <div className="h-full bg-white rounded-3xl border border-[#E2E8F0] p-8 flex flex-col justify-between shadow-sm hover:border-[#FFC300]/50 transition-colors">
                 <div>
-                  <div className="flex gap-1 mb-4">
-                    {Array.from({ length: t.rating }).map((_, j) => (
-                      <Star key={j} size={16} fill={C.accent} color={C.accent} />
+                  <div className="flex items-center gap-1 text-[#FFC300] mb-4">
+                    {[...Array(t.stars)].map((_, i) => (
+                      <Star key={i} size={16} fill="#FFC300" strokeWidth={0} />
                     ))}
                   </div>
-                  <p className="font-body text-sm leading-relaxed" style={{ color: C.fgMuted }}>
-                    "{t.text}"
+
+                  <p className="font-body text-sm text-[#0F172A] leading-relaxed italic mb-6">
+                    "{t.quote}"
                   </p>
                 </div>
 
-                {/* Author */}
-                <div className="flex items-center gap-3 mt-6 pt-6 border-t" style={{ borderColor: C.border }}>
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center font-display text-sm font-bold"
-                    style={{ backgroundColor: C.accentLight, color: C.accentDark }}
-                  >
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-display text-sm font-bold" style={{ color: C.fg }}>
-                      {t.name}
-                    </p>
-                    <p className="font-body text-xs" style={{ color: C.fgMuted }}>
-                      {t.role}
-                    </p>
-                  </div>
+                <div className="pt-4 border-t border-[#F1F5F9]">
+                  <h4 className="font-display font-bold text-sm text-[#0F172A]">{t.name}</h4>
+                  <p className="text-xs text-[#64748B]">{t.role}</p>
+                  <span className="text-[11px] font-mono-data text-[#E0AB00] font-semibold block mt-0.5">
+                    📍 {t.city}, India
+                  </span>
                 </div>
               </div>
-            </Reveal>
+            </TiltCard>
           ))}
         </div>
       </div>
@@ -1279,171 +1188,129 @@ function TestimonialsSection() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   FINAL CTA
+   8. FINAL CALL TO ACTION
    ═══════════════════════════════════════════════════════════════════════════════ */
 function FinalCTA({ onNavigateToAuth }) {
   return (
-    <section className="relative overflow-hidden py-24 md:py-32" style={{ backgroundColor: C.accent }}>
-      {/* Decorative elements */}
-      <div className="pointer-events-none absolute -top-20 -left-20 h-60 w-60 rounded-full opacity-20" style={{ backgroundColor: "#fff" }} />
-      <div className="pointer-events-none absolute -bottom-16 -right-16 h-48 w-48 rounded-full opacity-15" style={{ backgroundColor: "#fff" }} />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full opacity-10"
-        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%)" }}
-      />
+    <section className="py-24 px-6 bg-white relative overflow-hidden">
+      <div className="max-w-5xl mx-auto relative rounded-3xl bg-gradient-to-br from-[#FFFDF5] via-[#FFF9E6] to-[#FEF08A]/30 border-2 border-[#FFC300]/40 p-10 sm:p-16 shadow-[0_20px_50px_rgba(255,195,0,0.15)] text-center overflow-hidden">
+        
+        {/* Background Concentric Rings */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-[#FFC300]/20 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-[#FFC300]/30 pointer-events-none" />
 
-      <div className="relative mx-auto max-w-3xl px-6 text-center">
-        <Reveal>
-          <h2
-            className="font-display text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight"
-            style={{ color: C.fg }}
-          >
-            Ready to Never Miss
-            <br />a Call Again?
+        <div className="relative z-10 max-w-2xl mx-auto">
+          <SectionBadge icon={Sparkle}>Start Today in Under 3 Minutes</SectionBadge>
+          
+          <h2 className="font-display text-4xl sm:text-5xl font-black text-[#0F172A] tracking-tight descender-safe">
+            Ready to Never Miss Another Ring?
           </h2>
-        </Reveal>
 
-        <Reveal delay={0.15}>
-          <p
-            className="font-body mt-6 text-lg md:text-xl max-w-xl mx-auto"
-            style={{ color: "rgba(15,23,42,0.7)" }}
-          >
-            Join 5,000+ Indian businesses already using Callify to delight
-            customers and save hours every week.
+          <p className="font-body text-base sm:text-lg text-[#64748B] mt-4 mb-8 leading-relaxed">
+            Test Callify risk-free for 14 days. We forward your current number with zero downtime or hardware required.
           </p>
-        </Reveal>
 
-        <Reveal delay={0.25}>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <motion.button
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <MagneticButton
               onClick={onNavigateToAuth}
-              whileHover={{
-                scale: 1.05,
-                boxShadow: "0 8px 30px rgba(15,23,42,0.15)",
-              }}
-              whileTap={{ scale: 0.97 }}
-              className="inline-flex items-center gap-2.5 rounded-full px-8 py-4 text-base font-semibold font-body shadow-lg cursor-pointer border-none"
-              style={{ backgroundColor: C.fg, color: "#FFFFFF" }}
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#0F172A] text-white hover:bg-[#1E293B] shadow-lg text-base gap-3"
             >
-              Get Started for Free
-              <ArrowRight size={16} />
-            </motion.button>
-
-            <motion.a
-              href="mailto:hello@callify.in"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.97 }}
-              className="inline-flex items-center gap-2 rounded-full border-2 px-8 py-4 text-base font-semibold font-body cursor-pointer no-underline"
-              style={{ borderColor: "rgba(15,23,42,0.2)", color: C.fg }}
-            >
-              Talk to Sales
-            </motion.a>
+              <span className="font-bold">Deploy Your AI Receptionist</span>
+              <ArrowRight size={18} className="text-[#FFC300]" />
+            </MagneticButton>
           </div>
-        </Reveal>
 
-        <Reveal delay={0.35}>
-          <div
-            className="mt-8 flex flex-wrap items-center justify-center gap-6 font-body text-sm"
-            style={{ color: "rgba(15,23,42,0.6)" }}
-          >
-            {["Free 14-day trial", "No setup fees", "Cancel anytime"].map(
-              (item) => (
-                <span key={item} className="flex items-center gap-1.5">
-                  <CheckCircle2 size={14} color={C.fg} />
-                  {item}
-                </span>
-              )
-            )}
-          </div>
-        </Reveal>
+          <p className="font-mono-data text-xs text-[#64748B] mt-5">
+            🔒 No credit card required • Instant automated setup • 24/7 Concierge Onboarding
+          </p>
+        </div>
       </div>
     </section>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   FOOTER
+   9. FOOTER
    ═══════════════════════════════════════════════════════════════════════════════ */
 function Footer() {
-  const footerLinks = {
-    Product: ["Features", "Pricing", "Integrations", "Changelog"],
-    Company: ["About", "Careers", "Blog", "Press"],
-    Resources: ["Documentation", "API Reference", "Community", "Status"],
-    Legal: ["Privacy Policy", "Terms of Service", "Security", "DPDP Compliance"],
-  };
-
   return (
-    <footer className="py-16 border-t" style={{ backgroundColor: C.bg, borderColor: C.border }}>
-      <div className="mx-auto max-w-7xl px-6">
-        <div className="grid gap-10 md:grid-cols-6">
-          {/* Brand Column */}
-          <div className="md:col-span-2">
-            <a href="#" className="flex items-center gap-2 mb-4 no-underline">
+    <footer className="bg-[#0F172A] text-white py-16 px-6 border-t border-slate-800">
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-12 border-b border-slate-800">
+          
+          <div className="md:col-span-5">
+            <div className="flex items-center gap-2.5 mb-4">
               <div
                 className="flex h-9 w-9 items-center justify-center rounded-xl"
                 style={{ backgroundColor: C.accent }}
               >
                 <Phone size={18} color={C.fg} strokeWidth={2.5} />
               </div>
-              <span className="font-display text-xl font-bold" style={{ color: C.fg }}>
+              <span className="font-display text-2xl font-black tracking-tight text-white">
                 Callify
               </span>
-            </a>
-            <p className="font-body text-sm leading-relaxed mb-4" style={{ color: C.fgMuted }}>
-              India's smartest AI voice receptionist platform.
-              Trusted by 5,000+ businesses across the country.
-            </p>
-            <div className="flex items-center gap-2 font-body text-xs" style={{ color: C.fgMuted }}>
-              <MapPin size={12} />
-              <span>Mumbai, Maharashtra, India</span>
             </div>
-            <div className="flex items-center gap-2 font-body text-xs mt-1" style={{ color: C.fgMuted }}>
-              <Mail size={12} />
-              <span>hello@callify.in</span>
+            <p className="font-body text-sm text-slate-400 max-w-sm leading-relaxed mb-6">
+              India's premier AI voice telephony automation engine. Eliminating unanswered business calls with empathetic multilingual intelligence.
+            </p>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs font-mono-data text-[#FFC300]">
+              <span>🇮🇳 Built with pride for Indian Enterprises</span>
             </div>
           </div>
 
-          {/* Link Columns */}
-          {Object.entries(footerLinks).map(([section, links]) => (
-            <div key={section}>
-              <h4 className="font-body text-sm font-semibold mb-4" style={{ color: C.fg }}>
-                {section}
-              </h4>
-              <ul className="space-y-3 list-none p-0 m-0">
-                {links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="font-body text-sm transition-colors duration-200 hover:text-[#FFC300] no-underline"
-                      style={{ color: C.fgMuted }}
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+          <div className="md:col-span-2">
+            <h4 className="font-display text-xs font-bold uppercase tracking-wider text-slate-300 mb-4">
+              Product
+            </h4>
+            <ul className="space-y-2 text-sm text-slate-400 font-body">
+              <li><a href="#live-simulator" className="hover:text-white transition-colors">Live Voice Lab</a></li>
+              <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+              <li><a href="#roi-calculator" className="hover:text-white transition-colors">ROI Calculator</a></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing Plans</a></li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-2">
+            <h4 className="font-display text-xs font-bold uppercase tracking-wider text-slate-300 mb-4">
+              Industries
+            </h4>
+            <ul className="space-y-2 text-sm text-slate-400 font-body">
+              <li>Healthcare & Clinics</li>
+              <li>Salons & Spas</li>
+              <li>Automotive Care</li>
+              <li>Real Estate Brokers</li>
+              <li>Legal & Consultancy</li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-3">
+            <h4 className="font-display text-xs font-bold uppercase tracking-wider text-slate-300 mb-4">
+              Security & Compliance
+            </h4>
+            <div className="space-y-2 text-xs text-slate-400 font-mono-data">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span>SOC2 Type II Certified Cloud</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span>ISO 27001 Data Encryption</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                <span>HIPAA BAA Eligible Architecture</span>
+              </div>
             </div>
-          ))}
+          </div>
+
         </div>
 
-        {/* Bottom Bar */}
-        <div
-          className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-8"
-          style={{ borderColor: C.border }}
-        >
-          <span className="font-body text-xs" style={{ color: C.fgMuted }}>
-            © {new Date().getFullYear()} Callify Technologies Pvt. Ltd. All rights reserved.
-          </span>
-          <div className="flex items-center gap-4">
-            {["Twitter", "LinkedIn", "Instagram", "YouTube"].map((social) => (
-              <a
-                key={social}
-                href="#"
-                className="font-body text-xs transition-colors duration-200 hover:text-[#FFC300] no-underline"
-                style={{ color: C.fgMuted }}
-              >
-                {social}
-              </a>
-            ))}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 font-mono-data gap-4">
+          <p>© {new Date().getFullYear()} Callify Technologies India Pvt Ltd. All rights reserved.</p>
+          <div className="flex gap-6">
+            <a href="#" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-300 transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-slate-300 transition-colors">Security Disclosures</a>
           </div>
         </div>
       </div>
@@ -1452,22 +1319,28 @@ function Footer() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   MAIN LANDING PAGE EXPORT
+   MAIN EXPORT: LANDING PAGE ORCHESTRATOR
    ═══════════════════════════════════════════════════════════════════════════════ */
 export default function LandingPage({ onNavigateToAuth }) {
   return (
-    <div className="min-h-screen font-body" style={{ backgroundColor: C.bg, color: C.fg }}>
+    <div className="min-h-screen bg-white text-[#0F172A] font-body selection:bg-[#FFC300] selection:text-[#0F172A] overflow-x-clip w-full relative pb-20 md:pb-0">
       <Navbar onNavigateToAuth={onNavigateToAuth} />
+      
       <main>
         <HeroSection onNavigateToAuth={onNavigateToAuth} />
         <TrustedBySection />
-        <StatsBar />
-        <FeaturesSection />
         <HowItWorksSection />
+        <FeaturesSection />
+        
+        <div id="roi-calculator">
+          <RoiCalculator onNavigateToAuth={onNavigateToAuth} />
+        </div>
+        
         <PricingSection onNavigateToAuth={onNavigateToAuth} />
         <TestimonialsSection />
         <FinalCTA onNavigateToAuth={onNavigateToAuth} />
       </main>
+
       <Footer />
     </div>
   );

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* ─── Light White & Yellow Theme ─── */
+  /* ─── Light White & Yellow/Gold Theme (Preserved) ─── */
   --color-base-bg: #FFFFFF;
   --color-surface-card: #FAFAFA;
   --color-surface-alt: #F8FAFC;
@@ -10,24 +10,61 @@
   --color-accent-yellow: #FFC300;
   --color-accent-dark: #E0AB00;
   --color-accent-light: #FFF9E6;
+  --color-accent-gold: #F59E0B;
   --color-border: #F1F5F9;
   --color-border-strong: #E2E8F0;
 
-  --font-display: "Outfit", sans-serif;
-  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-sans: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
   --font-mono-data: "JetBrains Mono", monospace;
+  --font-serif-display: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans-ui: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-in-out-smooth: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 @layer utilities {
-  /* Subtle dot grid pattern for light backgrounds */
+  /* Subtle acoustic dot grid pattern */
   .light-dot-grid {
-    background-image: radial-gradient(rgba(255, 195, 0, 0.07) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(255, 195, 0, 0.08) 1.25px, transparent 1.25px);
     background-size: 24px 24px;
   }
 
-  /* Radial glow overlay */
+  /* Radial acoustic aura */
   .hero-glow {
-    background: radial-gradient(circle at 50% 30%, rgba(255, 195, 0, 0.12) 0%, transparent 60%);
+    background: radial-gradient(circle at 50% 30%, rgba(255, 195, 0, 0.16) 0%, rgba(255, 249, 230, 0.4) 35%, transparent 70%);
+  }
+
+  /* Glassmorphism for Light Mode */
+  .glass-card-light {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    box-shadow: 0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+  }
+
+  .glass-card-amber {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 195, 0, 0.35);
+    box-shadow: 0 10px 30px -4px rgba(255, 195, 0, 0.15), 0 2px 6px rgba(15, 23, 42, 0.03);
+  }
+
+  /* Descender typography safety */
+  .descender-safe {
+    overflow: visible !important;
+    padding-bottom: 0.18em;
+  }
+
+  /* Perspective for 3D card tilt */
+  .perspective-1000 {
+    perspective: 1000px;
   }
 
   /* Custom scrollbar for light theme */
@@ -39,16 +76,11 @@
     background: rgba(241, 245, 249, 0.8);
   }
   .modern-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 195, 0, 0.3);
+    background: rgba(255, 195, 0, 0.4);
     border-radius: 9999px;
   }
   .modern-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #FFC300;
-  }
-
-  /* Card hover glow */
-  .card-glow-transition {
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Pulse animation */
@@ -68,39 +100,51 @@
   }
 
   /* Floating animation */
-  @keyframes float {
+  @keyframes float-subtle {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
+    50% { transform: translateY(-8px); }
   }
 
   .animate-float {
-    animation: float 6s ease-in-out infinite;
+    animation: float-subtle 5s ease-in-out infinite;
   }
 
   .animate-float-delayed {
-    animation: float 6s ease-in-out 2s infinite;
+    animation: float-subtle 5s ease-in-out 2s infinite;
   }
 
-  /* Ripple for play button */
-  @keyframes ripple {
-    0%   { transform: scale(1);   opacity: 0.5; }
-    100% { transform: scale(2.2); opacity: 0;   }
-  }
-  .play-ripple {
-    animation: ripple 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  }
-  .play-ripple-delay {
-    animation: ripple 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    animation-delay: 0.6s;
+  /* Ripple for incoming calls */
+  @keyframes radar-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
   }
 
-  /* Marquee */
-  @keyframes marquee {
+  .radar-ripple {
+    animation: radar-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
+  .radar-ripple-delay {
+    animation: radar-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) 0.75s infinite;
+  }
+
+  /* Marquee animation */
+  @keyframes marquee-scroll {
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
   }
+
   .animate-marquee {
-    animation: marquee 30s linear infinite;
+    animation: marquee-scroll 28s linear infinite;
+  }
+
+  .animate-marquee:hover {
+    animation-play-state: paused;
   }
 }
 
@@ -110,9 +154,27 @@
   color: #0F172A;
 }
 
+html, body, input, select, textarea, button {
+  font-family: var(--font-body), "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), "Plus Jakarta Sans", "Inter", sans-serif;
+}
+
 body {
-  font-family: var(--font-body), "Plus Jakarta Sans", sans-serif;
   background-color: #FFFFFF;
   color: #0F172A;
   overflow-x: hidden;
+  min-height: 100dvh;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
