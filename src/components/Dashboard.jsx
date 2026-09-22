@@ -22,7 +22,6 @@ import {
   Activity,
   PhoneForwarded,
   Calendar,
-  SlidersHorizontal,
 } from "lucide-react";
 import SVGCharts from "./SVGCharts";
 import Appointments from "./Appointments";
