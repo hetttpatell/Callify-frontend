@@ -138,7 +138,16 @@ export default function Settings({ session, businessId }) {
             .eq("id", session.user.id)
             .maybeSingle();
 
-          effectiveId = userRow?.business_id || session.user.id;
+          effectiveId = userRow?.business_id;
+          if (!effectiveId) {
+            const { data: bData } = await supabase
+              .from("businesses")
+              .select("id")
+              .or(`owner_id.eq.${session.user.id},user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+              .limit(1)
+              .maybeSingle();
+            effectiveId = bData?.id || session.user.id;
+          }
         }
 
         setTargetBusinessId(effectiveId);

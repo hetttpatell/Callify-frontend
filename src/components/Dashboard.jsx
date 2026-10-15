@@ -60,7 +60,24 @@ export default function Dashboard({ session, onLogout }) {
           .eq("id", session.user.id)
           .maybeSingle();
 
-        const effectiveBusinessId = userProfile?.business_id || session.user.id;
+        let effectiveBusinessId = userProfile?.business_id;
+        if (!effectiveBusinessId) {
+          const { data: bData } = await supabase
+            .from("businesses")
+            .select("id")
+            .or(`owner_id.eq.${session.user.id},user_id.eq.${session.user.id},id.eq.${session.user.id}`)
+            .limit(1)
+            .maybeSingle();
+          effectiveBusinessId = bData?.id || session.user.id;
+          if (bData?.id) {
+            await supabase.from("users").upsert({
+              id: session.user.id,
+              business_id: bData.id,
+              role: userProfile?.role || "business_owner",
+            });
+          }
+        }
+
         setBusinessId(effectiveBusinessId);
         if (userProfile?.role) {
           setUserRole(userProfile.role);
@@ -73,7 +90,7 @@ export default function Dashboard({ session, onLogout }) {
           .maybeSingle();
 
         if (data) {
-          setBusinessName(data.business_name || "Callify Node");
+          setBusinessName(data.business_name || "SmileCare Dental Clinic");
           setExotelNumber(data.exotel_number || "");
         }
 
@@ -106,7 +123,7 @@ export default function Dashboard({ session, onLogout }) {
         // Fetch recent call logs for overview
         const { data: recentCallsData } = await supabase
           .from("call_logs")
-          .select("id, caller_phone, status, duration_sec, sentiment, created_at")
+          .select("id, caller_phone, caller_name, status, duration_seconds, category, outcome, created_at")
           .eq("business_id", effectiveBusinessId)
           .order("created_at", { ascending: false })
           .limit(5);
@@ -162,7 +179,7 @@ export default function Dashboard({ session, onLogout }) {
 
               const { data: updatedCalls } = await supabase
                 .from("call_logs")
-                .select("id, caller_phone, status, duration_sec, sentiment, created_at")
+                .select("id, caller_phone, caller_name, status, duration_seconds, category, outcome, created_at")
                 .eq("business_id", effectiveBusinessId)
                 .order("created_at", { ascending: false })
                 .limit(5);
@@ -684,7 +701,7 @@ export default function Dashboard({ session, onLogout }) {
                                   {call.caller_phone || "+91 ••• ••• ••••"}
                                 </p>
                                 <p className="text-[10px] text-[#64748B]">
-                                  {call.duration_sec ? `${call.duration_sec}s call` : "32s call"} • {call.sentiment || "Neutral"}
+                                  {call.duration_seconds ? `${call.duration_seconds}s call` : "35s call"} • {call.category || call.outcome || "Appointment"}
                                 </p>
                               </div>
                             </div>

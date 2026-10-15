@@ -53,7 +53,16 @@ export default function Appointments({ session, businessId }) {
         .eq("id", session?.user?.id)
         .maybeSingle();
 
-      const effId = userProfile?.business_id || session?.user?.id;
+      let effId = userProfile?.business_id;
+      if (!effId) {
+        const { data: bData } = await supabase
+          .from("businesses")
+          .select("id")
+          .or(`owner_id.eq.${session?.user?.id},user_id.eq.${session?.user?.id},id.eq.${session?.user?.id}`)
+          .limit(1)
+          .maybeSingle();
+        effId = bData?.id || session?.user?.id;
+      }
       setResolvedBusinessId(effId);
       return effId;
     } catch {

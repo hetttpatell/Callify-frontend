@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,18 +12,29 @@ import {
   Phone,
   CheckCircle2,
   LockKeyhole,
+  KeyRound,
+  ArrowLeft,
 } from "lucide-react";
 import AcousticVisualizer from "./AcousticVisualizer";
 import MagneticButton from "./MagneticButton";
 
-export default function Auth({ onAuthSuccess, onBackToLanding }) {
-  const [isSignUp, setIsSignUp] = useState(false);
+export default function Auth({ onAuthSuccess, onBackToLanding, initialMode = "signin" }) {
+  // Modes: "signin" | "signup" | "forgot_password" | "update_password"
+  const [authMode, setAuthMode] = useState(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Check URL hash for Supabase password recovery tokens
+  useEffect(() => {
+    if (window.location.hash && window.location.hash.includes("type=recovery")) {
+      setAuthMode("update_password");
+    }
+  }, []);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -32,7 +43,7 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
     setSuccessMsg("");
 
     try {
-      if (isSignUp) {
+      if (authMode === "signup") {
         if (!businessName.trim()) {
           throw new Error("Business name is required.");
         }
@@ -58,7 +69,7 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
         } else {
           setSuccessMsg("Registration successful! Please check your inbox for verification.");
         }
-      } else {
+      } else if (authMode === "signin") {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -73,6 +84,44 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
             onAuthSuccess(data.session);
           }, 900);
         }
+      } else if (authMode === "forgot_password") {
+        if (!email.trim()) {
+          throw new Error("Please enter your email address.");
+        }
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/#type=recovery`,
+        });
+
+        if (error) throw error;
+
+        setSuccessMsg(
+          `Password reset link dispatched to ${email}. Please check your inbox or spam folder.`
+        );
+      } else if (authMode === "update_password") {
+        if (!newPassword || newPassword.length < 6) {
+          throw new Error("New password must be at least 6 characters.");
+        }
+
+        const { data, error } = await supabase.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (error) throw error;
+
+        setSuccessMsg("Password successfully updated! Redirecting to workspace...");
+        setTimeout(async () => {
+          if (data.user) {
+            await verifyOrSeedBusiness(data.user.id);
+          }
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session) {
+            onAuthSuccess(sessionData.session);
+          } else {
+            setAuthMode("signin");
+            setSuccessMsg("Password updated. Please sign in with your new password.");
+          }
+        }, 1200);
       }
     } catch (err) {
       console.error("Auth error:", err);
@@ -115,25 +164,43 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
 
   const verifyOrSeedBusiness = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from("businesses")
-        .select("id")
+      // 1. Check user profile for existing business_id
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("business_id, role, full_name")
         .eq("id", userId)
         .maybeSingle();
 
-      if (!data && !error) {
-        await createInitialBusinessRecord(userId, email.split("@")[0].toUpperCase());
-      } else {
-        // Ensure users row has business_id and role
+      let targetBusinessId = userProfile?.business_id;
+
+      // 2. If no business_id on user record, search businesses table
+      if (!targetBusinessId) {
+        const { data: existingBusiness } = await supabase
+          .from("businesses")
+          .select("id, business_name")
+          .or(`owner_id.eq.${userId},user_id.eq.${userId},id.eq.${userId}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingBusiness) {
+          targetBusinessId = existingBusiness.id;
+        }
+      }
+
+      // 3. If we found a business, guarantee the user profile is properly linked
+      if (targetBusinessId) {
         await supabase.from("users").upsert({
           id: userId,
-          email: email,
-          role: "business_owner",
-          business_id: data.id,
+          email: email || userProfile?.email,
+          role: userProfile?.role || "business_owner",
+          business_id: targetBusinessId,
         });
+      } else {
+        // Only seed a fresh business if no business exists at all
+        await createInitialBusinessRecord(userId, email.split("@")[0].toUpperCase());
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error in verifyOrSeedBusiness:", e);
     }
   };
 
@@ -212,48 +279,70 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
         {/* ── Right Auth Form Panel ── */}
         <div className="lg:col-span-7 p-8 sm:p-12 flex flex-col justify-between bg-white">
           <div>
-            {/* View Switcher Tabs */}
-            <div className="flex p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] mb-8 max-w-sm">
+            {/* View Switcher Tabs (Only in signin or signup modes) */}
+            {(authMode === "signin" || authMode === "signup") && (
+              <div className="flex p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] mb-8 max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-display font-bold transition-all cursor-pointer ${
+                    authMode === "signin"
+                      ? "bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]"
+                      : "text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-display font-bold transition-all cursor-pointer ${
+                    authMode === "signup"
+                      ? "bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]"
+                      : "text-[#64748B] hover:text-[#0F172A]"
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
+
+            {/* Back Button for Forgot Password / Reset Password */}
+            {(authMode === "forgot_password" || authMode === "update_password") && (
               <button
                 type="button"
                 onClick={() => {
-                  setIsSignUp(false);
+                  setAuthMode("signin");
                   setErrorMsg("");
                   setSuccessMsg("");
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-display font-bold transition-all cursor-pointer ${
-                  !isSignUp
-                    ? "bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
+                className="inline-flex items-center gap-1.5 text-xs font-display font-bold uppercase tracking-wider text-[#64748B] hover:text-[#0F172A] transition-colors mb-6 cursor-pointer"
               >
-                Sign In
+                <ArrowLeft size={15} />
+                <span>Back to Sign In</span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUp(true);
-                  setErrorMsg("");
-                  setSuccessMsg("");
-                }}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-display font-bold transition-all cursor-pointer ${
-                  isSignUp
-                    ? "bg-white text-[#0F172A] shadow-sm border border-[#E2E8F0]"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
+            )}
 
             <div className="mb-6">
               <h3 className="font-display text-2xl font-black text-[#0F172A] tracking-tight">
-                {isSignUp ? "Deploy Your AI Receptionist" : "Sign In to Console"}
+                {authMode === "signup" && "Deploy Your AI Receptionist"}
+                {authMode === "signin" && "Sign In to Console"}
+                {authMode === "forgot_password" && "Reset Your Password"}
+                {authMode === "update_password" && "Set New Password"}
               </h3>
               <p className="font-body text-xs sm:text-sm text-[#64748B] mt-1">
-                {isSignUp
-                  ? "Get your dedicated phone number and start taking calls in minutes."
-                  : "Access your business appointments, logs, and voice configurations."}
+                {authMode === "signup" && "Get your dedicated phone number and start taking calls in minutes."}
+                {authMode === "signin" && "Access your business appointments, logs, and voice configurations."}
+                {authMode === "forgot_password" && "Enter your email address and we will dispatch a recovery link to reset your credentials."}
+                {authMode === "update_password" && "Choose a secure new password for your Callify workspace account."}
               </p>
             </div>
 
@@ -287,7 +376,7 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
             {/* Form */}
             <form onSubmit={handleAuth} className="space-y-4">
               {/* Business Name (Sign Up Only) */}
-              {isSignUp && (
+              {authMode === "signup" && (
                 <div>
                   <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A] mb-1.5">
                     Business / Clinic Name
@@ -297,7 +386,7 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Apex Wellness Care"
+                      placeholder="e.g. SmileCare Dental Clinic"
                       value={businessName}
                       onChange={(e) => setBusinessName(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
@@ -306,41 +395,80 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
                 </div>
               )}
 
-              {/* Email Address */}
-              <div>
-                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A] mb-1.5">
-                  Work Email Address
-                </label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="doctor@clinic.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
-                  />
+              {/* Email Address (For Sign In, Sign Up, and Forgot Password) */}
+              {authMode !== "update_password" && (
+                <div>
+                  <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A] mb-1.5">
+                    Work Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="hetpatel140505@gmail.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A] mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <LockKeyhole size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
-                  />
+              {/* Password (Sign In & Sign Up) */}
+              {(authMode === "signin" || authMode === "signup") && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A]">
+                      Password
+                    </label>
+                    {authMode === "signin" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode("forgot_password");
+                          setErrorMsg("");
+                          setSuccessMsg("");
+                        }}
+                        className="text-xs font-semibold text-[#E0AB00] hover:text-[#0F172A] transition-colors cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <LockKeyhole size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* New Password (Update Password Mode) */}
+              {authMode === "update_password" && (
+                <div>
+                  <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#0F172A] mb-1.5">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <LockKeyhole size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Minimum 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#FAFAFA] border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:border-[#FFC300] focus:ring-2 focus:ring-[#FFC300]/20 transition-all font-body"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Submit Button */}
               <div className="pt-2">
@@ -351,10 +479,20 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
                 >
                   {loading ? (
                     <span className="w-5 h-5 border-2 border-[#FFC300] border-t-transparent rounded-full animate-spin" />
-                  ) : isSignUp ? (
+                  ) : authMode === "signup" ? (
                     <>
                       <span>Start 14-Day Free Pilot</span>
                       <UserPlus size={16} className="text-[#FFC300]" />
+                    </>
+                  ) : authMode === "forgot_password" ? (
+                    <>
+                      <span>Send Password Reset Link</span>
+                      <KeyRound size={16} className="text-[#FFC300]" />
+                    </>
+                  ) : authMode === "update_password" ? (
+                    <>
+                      <span>Save New Password</span>
+                      <CheckCircle2 size={16} className="text-[#FFC300]" />
                     </>
                   ) : (
                     <>
@@ -367,17 +505,21 @@ export default function Auth({ onAuthSuccess, onBackToLanding }) {
             </form>
           </div>
 
-          {/* Quick Demo Switcher Tip */}
-          <div className="mt-8 pt-6 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
-            <span>Need a test account? Sign up with any valid email format.</span>
+          {/* Quick Login Auto-fill Helper */}
+          <div className="mt-8 pt-6 border-t border-[#F1F5F9] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#64748B]">
+            <span>Account: <strong>hetpatel140505@gmail.com</strong></span>
             <button
+              type="button"
               onClick={() => {
-                setEmail("demo@callify.in");
-                setPassword("demo123456");
+                setEmail("hetpatel140505@gmail.com");
+                setPassword("1234567");
+                setAuthMode("signin");
+                setErrorMsg("");
+                setSuccessMsg("Filled credentials for hetpatel140505@gmail.com");
               }}
               className="text-[#E0AB00] font-bold hover:underline cursor-pointer"
             >
-              Fill Demo Login
+              Fill Credentials (1234567)
             </button>
           </div>
         </div>

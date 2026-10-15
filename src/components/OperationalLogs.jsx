@@ -43,7 +43,16 @@ export default function OperationalLogs({ businessId, session }) {
         .eq("id", session?.user?.id)
         .maybeSingle();
 
-      const effId = userProfile?.business_id || session?.user?.id;
+      let effId = userProfile?.business_id;
+      if (!effId) {
+        const { data: bData } = await supabase
+          .from("businesses")
+          .select("id")
+          .or(`owner_id.eq.${session?.user?.id},user_id.eq.${session?.user?.id},id.eq.${session?.user?.id}`)
+          .limit(1)
+          .maybeSingle();
+        effId = bData?.id || session?.user?.id;
+      }
       setResolvedBusinessId(effId);
       return effId;
     } catch {
@@ -184,6 +193,21 @@ export default function OperationalLogs({ businessId, session }) {
       if (data) {
         setLogs((prev) => [data, ...prev]);
         setSelectedId(data.id);
+
+        // If this was an appointment booking call, also save confirmed appointment to Supabase live
+        if (pick.category === "APPOINTMENT BOOKING" && resolvedBusinessId) {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const dateStr = tomorrow.toISOString().split("T")[0];
+          await supabase.from("appointments").insert({
+            business_id: resolvedBusinessId,
+            caller_phone: pick.phone,
+            service_name: "Dental Cleaning & Consultation",
+            date: dateStr,
+            time: "10:30 AM",
+            status: "Confirmed",
+          });
+        }
       }
     } catch (err) {
       console.error("Simulation error:", err);

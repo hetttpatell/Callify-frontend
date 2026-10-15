@@ -7,23 +7,33 @@ import { supabase } from './lib/supabaseClient';
 function App() {
   const [view, setView] = useState('landing'); // landing, auth, dashboard
   const [session, setSession] = useState(null);
+  const [authInitialMode, setAuthInitialMode] = useState('signin');
 
-  // Check Supabase Session on mount
+  // Check Supabase Session & URL Hash on mount
   useEffect(() => {
+    const isRecovery = window.location.hash && window.location.hash.includes('type=recovery');
+    if (isRecovery) {
+      setAuthInitialMode('update_password');
+      setView('auth');
+    }
+
     // Auth session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
+      if (session && !isRecovery) {
         setView('dashboard');
       }
     });
 
     // Auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthInitialMode('update_password');
+        setView('auth');
+      } else if (session && !isRecovery) {
         setView('dashboard');
-      } else {
+      } else if (!session) {
         setView('landing');
       }
     });
@@ -37,6 +47,7 @@ function App() {
     if (session) {
       setView('dashboard');
     } else {
+      setAuthInitialMode('signin');
       setView('auth');
     }
   };
@@ -58,6 +69,7 @@ function App() {
   if (view === 'auth') {
     return (
       <Auth 
+        initialMode={authInitialMode}
         onAuthSuccess={(newSession) => {
           setSession(newSession);
           setView('dashboard');
